@@ -25,23 +25,17 @@ func TestScrapeProxiesUseCase_Execute(t *testing.T) {
 	proxy2 := &scraper.ScrapedProxy{IP: "2.2.2.2", Port: 8080, Protocol: "http"}
 	proxyDuplicate := &scraper.ScrapedProxy{IP: "1.1.1.1", Port: 8080, Protocol: "http"} // Same as proxy1
 
-	// Expectations
-	// Source 1 returns valid proxies
 	mockFetcher.On("FetchAndParse", mock.Anything, sources[0]).Return([]*scraper.ScrapedProxy{proxy1}, nil)
-	// Source 2 returns valid proxies + duplicate
 	mockFetcher.On("FetchAndParse", mock.Anything, sources[1]).Return([]*scraper.ScrapedProxy{proxy2, proxyDuplicate}, nil)
 
-	// Execute
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	result, err := useCase.Execute(ctx)
 
-	// Assertions
 	assert.NoError(t, err)
 	assert.Len(t, result, 2, "Should have 2 unique proxies")
 
-	// Verify deduplication (we can't guarantee order, so check existence)
 	ips := make(map[string]bool)
 	for _, p := range result {
 		ips[p.IP] = true
@@ -53,22 +47,16 @@ func TestScrapeProxiesUseCase_Execute(t *testing.T) {
 }
 
 func TestScrapeProxiesUseCase_Execute_ErrorHandling(t *testing.T) {
-	// Setup
 	mockFetcher := mocks.NewFetcher(t)
 	sources := []scraper.Source{
 		{Name: "Source1", URL: "http://source1.com", Type: "http"},
 	}
 	useCase := scraper.NewScrapeProxiesUseCase(mockFetcher, sources)
 
-	// Expectations
-	// Simulate error from fetcher
 	mockFetcher.On("FetchAndParse", mock.Anything, sources[0]).Return(nil, errors.New("network error"))
 
-	// Execute
 	result, err := useCase.Execute(context.Background())
 
-	// Assertions
-	// Current implementation swallows errors from individual fetchers and returns what it can
 	assert.NoError(t, err)
 	assert.Empty(t, result)
 }

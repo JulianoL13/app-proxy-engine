@@ -2,12 +2,11 @@ package scraper
 
 import (
 	"context"
-	"fmt" // Added for Sprintf
+	"fmt"
 	"sync"
 	"time"
 )
 
-// Fetcher defines the contract for downloading proxy lists.
 type Fetcher interface {
 	FetchAndParse(ctx context.Context, source Source) ([]*ScrapedProxy, error)
 }
@@ -58,7 +57,6 @@ func (uc *ScrapeProxiesUseCase) Execute(ctx context.Context) ([]*ScrapedProxy, e
 		}
 	}
 
-	// Convert map to slice
 	finalList := make([]*ScrapedProxy, 0, len(uniqueProxies))
 	for _, p := range uniqueProxies {
 		finalList = append(finalList, p)
