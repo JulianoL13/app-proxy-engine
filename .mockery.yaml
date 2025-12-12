@@ -1,0 +1,20 @@
+with-expecter: true
+packages:
+  github.com/JulianoL13/app-proxy-engine/internal/verifier:
+    config:
+      dir: internal/verifier/mocks
+      outpkg: mocks
+    interfaces:
+      ProxyChecker: 
+        config: {}
+      Verifiable:
+        config: {}
+  github.com/JulianoL13/app-proxy-engine/internal/scraper:
+    config:
+      dir: internal/scraper/mocks
+      outpkg: mocks
+    interfaces:
+      Fetcher:
+        config: {}
+mockname: "{{.InterfaceName}}"
+filename: "{{.InterfaceName}}.go"
