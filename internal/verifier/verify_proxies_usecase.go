@@ -11,74 +11,72 @@ type ProxyChecker interface {
 	Verify(ctx context.Context, p Verifiable) VerifyOutput
 }
 
-type VerifyProxiesUseCase struct {
-	checker     ProxyChecker
-	concurrency int
-	logger      logs.Logger
+// TaskExecutor defines the contract for running tasks concurrently
+type TaskExecutor interface {
+	Start()
+	Submit(job func(ctx context.Context))
+	Stop()
 }
 
-func NewVerifyProxiesUseCase(checker ProxyChecker, concurrency int, logger logs.Logger) *VerifyProxiesUseCase {
+type VerifyProxiesUseCase struct {
+	checker ProxyChecker
+	pool    TaskExecutor
+	logger  logs.Logger
+}
+
+func NewVerifyProxiesUseCase(checker ProxyChecker, pool TaskExecutor, logger logs.Logger) *VerifyProxiesUseCase {
 	return &VerifyProxiesUseCase{
-		checker:     checker,
-		concurrency: concurrency,
-		logger:      logger,
+		checker: checker,
+		pool:    pool,
+		logger:  logger,
 	}
 }
 
-func (uc *VerifyProxiesUseCase) Execute(ctx context.Context, proxies []Verifiable) map[string]VerifyOutput {
-	uc.logger.Info("starting proxy verification", "count", len(proxies), "concurrency", uc.concurrency)
+type StreamResult struct {
+	Address string
+	Output  VerifyOutput
+}
 
-	jobs := make(chan Verifiable, len(proxies))
-	resultsChan := make(chan struct {
-		Addr string
-		Res  VerifyOutput
-	}, len(proxies))
+// Execute streams results utilizing the injected WorkerPool
+func (uc *VerifyProxiesUseCase) Execute(ctx context.Context, proxies []Verifiable) <-chan StreamResult {
+	results := make(chan StreamResult, len(proxies))
 
-	var wg sync.WaitGroup
+	go func() {
+		defer close(results)
 
-	for i := 0; i < uc.concurrency; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for p := range jobs {
+		uc.logger.Info("starting proxy verification", "count", len(proxies))
+
+		// Local WaitGroup to track completion of THIS batch of proxies
+		var wg sync.WaitGroup
+		wg.Add(len(proxies))
+
+		for _, p := range proxies {
+			// Capture variable for closure
+			proxy := p
+
+			uc.pool.Submit(func(ctx context.Context) {
+				defer wg.Done()
+
 				select {
 				case <-ctx.Done():
 					return
 				default:
 				}
 
-				res := uc.checker.Verify(ctx, p)
+				res := uc.checker.Verify(ctx, proxy)
 
-				if !res.Success {
-					uc.logger.Debug("proxy verification failed", "address", p.Address(), "error", res.Error)
+				select {
+				case <-ctx.Done():
+					return
+				case results <- StreamResult{Address: proxy.Address(), Output: res}:
 				}
+			})
+		}
 
-				resultsChan <- struct {
-					Addr string
-					Res  VerifyOutput
-				}{
-					Addr: p.Address(),
-					Res:  res,
-				}
-			}
-		}()
-	}
-
-	for _, p := range proxies {
-		jobs <- p
-	}
-	close(jobs)
-
-	go func() {
+		// Wait for all jobs submitted in this execution to finish
 		wg.Wait()
-		close(resultsChan)
+		uc.logger.Info("verification completed")
 	}()
 
-	output := make(map[string]VerifyOutput)
-	for item := range resultsChan {
-		output[item.Addr] = item.Res
-	}
-
-	uc.logger.Info("verification completed", "total", len(output))
-	return output
+	return results
 }

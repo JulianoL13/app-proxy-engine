@@ -6,6 +6,7 @@ import (
 	"time"
 
 	logmocks "github.com/JulianoL13/app-proxy-engine/internal/common/logs/mocks"
+	"github.com/JulianoL13/app-proxy-engine/internal/common/workerpool"
 	"github.com/JulianoL13/app-proxy-engine/internal/verifier"
 	"github.com/JulianoL13/app-proxy-engine/internal/verifier/mocks"
 	"github.com/stretchr/testify/assert"
@@ -35,8 +36,17 @@ func TestVerifyProxiesUseCase_Execute(t *testing.T) {
 		mockChecker.On("Verify", mock.Anything, proxy1).Return(expectedResult)
 		mockChecker.On("Verify", mock.Anything, proxy2).Return(expectedResult)
 
-		uc := verifier.NewVerifyProxiesUseCase(mockChecker, 2, logmocks.LoggerMock{})
-		results := uc.Execute(ctx, proxies)
+		pool := workerpool.New(2)
+		pool.Start()
+		defer pool.Stop()
+
+		uc := verifier.NewVerifyProxiesUseCase(mockChecker, pool, logmocks.LoggerMock{})
+		resultChan := uc.Execute(ctx, proxies)
+
+		results := make(map[string]verifier.VerifyOutput)
+		for r := range resultChan {
+			results[r.Address] = r.Output
+		}
 
 		assert.Len(t, results, 2)
 		assert.Equal(t, expectedResult, results["1.1.1.1:8080"])
@@ -57,8 +67,17 @@ func TestVerifyProxiesUseCase_Execute(t *testing.T) {
 
 		mockChecker.On("Verify", mock.Anything, proxy).Return(failedResult)
 
-		uc := verifier.NewVerifyProxiesUseCase(mockChecker, 1, logmocks.LoggerMock{})
-		results := uc.Execute(ctx, []verifier.Verifiable{proxy})
+		pool := workerpool.New(1)
+		pool.Start()
+		defer pool.Stop()
+
+		uc := verifier.NewVerifyProxiesUseCase(mockChecker, pool, logmocks.LoggerMock{})
+		resultChan := uc.Execute(ctx, []verifier.Verifiable{proxy})
+
+		results := make(map[string]verifier.VerifyOutput)
+		for r := range resultChan {
+			results[r.Address] = r.Output
+		}
 
 		assert.Len(t, results, 1)
 		assert.False(t, results["3.3.3.3:8080"].Success)
