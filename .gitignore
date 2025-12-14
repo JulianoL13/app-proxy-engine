@@ -24,3 +24,5 @@
 tmp/
 dist/
 bin/
+
+.agent/
