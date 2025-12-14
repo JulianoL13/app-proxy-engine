@@ -27,5 +27,9 @@ packages:
         config: {}
       ProxyChecker:
         config: {}
+      Reader:
+        config: {}
+      Writer:
+        config: {}
 mockname: "{{.InterfaceName}}"
 filename: "{{.InterfaceName}}.go"
