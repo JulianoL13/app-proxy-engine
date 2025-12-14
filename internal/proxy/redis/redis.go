@@ -42,11 +42,13 @@ func (r *Repository) Save(ctx context.Context, p *proxy.Proxy) error {
 		return fmt.Errorf("marshal proxy: %w", err)
 	}
 
+	score := float64(time.Now().UnixNano()) / 1e9
+
 	pipe := r.client.Pipeline()
 
 	pipe.Set(ctx, key, data, r.ttl)
-	pipe.SAdd(ctx, aliveSetKey, p.Address())
-	pipe.SAdd(ctx, protocolPrefix+string(p.Protocol), p.Address())
+	pipe.ZAdd(ctx, aliveSetKey, redis.Z{Score: score, Member: p.Address()})
+	pipe.ZAdd(ctx, protocolPrefix+string(p.Protocol), redis.Z{Score: score, Member: p.Address()})
 
 	_, err = pipe.Exec(ctx)
 	if err != nil {
@@ -56,14 +58,38 @@ func (r *Repository) Save(ctx context.Context, p *proxy.Proxy) error {
 	return nil
 }
 
-func (r *Repository) GetAlive(ctx context.Context) ([]*proxy.Proxy, error) {
-	addresses, err := r.client.SMembers(ctx, aliveSetKey).Result()
+func (r *Repository) GetAlive(ctx context.Context, cursor float64, limit int) ([]*proxy.Proxy, float64, int, error) {
+	total, err := r.client.ZCard(ctx, aliveSetKey).Result()
 	if err != nil {
-		return nil, fmt.Errorf("get alive set: %w", err)
+		return nil, 0, 0, fmt.Errorf("zcard: %w", err)
+	}
+
+	if total == 0 {
+		return nil, 0, 0, nil
+	}
+
+	var addresses []string
+	if limit > 0 {
+		min := "-inf"
+		if cursor > 0 {
+			min = fmt.Sprintf("(%f", cursor)
+		}
+
+		addresses, err = r.client.ZRangeByScore(ctx, aliveSetKey, &redis.ZRangeBy{
+			Min:   min,
+			Max:   "+inf",
+			Count: int64(limit),
+		}).Result()
+	} else {
+		addresses, err = r.client.ZRange(ctx, aliveSetKey, 0, -1).Result()
+	}
+
+	if err != nil {
+		return nil, 0, 0, fmt.Errorf("zrange: %w", err)
 	}
 
 	if len(addresses) == 0 {
-		return nil, nil
+		return nil, 0, int(total), nil
 	}
 
 	keys := make([]string, len(addresses))
@@ -73,7 +99,7 @@ func (r *Repository) GetAlive(ctx context.Context) ([]*proxy.Proxy, error) {
 
 	values, err := r.client.MGet(ctx, keys...).Result()
 	if err != nil {
-		return nil, fmt.Errorf("mget proxies: %w", err)
+		return nil, 0, 0, fmt.Errorf("mget proxies: %w", err)
 	}
 
 	proxies := make([]*proxy.Proxy, 0, len(values))
@@ -95,10 +121,18 @@ func (r *Repository) GetAlive(ctx context.Context) ([]*proxy.Proxy, error) {
 		proxies = append(proxies, &p)
 	}
 
-	return proxies, nil
+	var nextCursor float64
+	if limit > 0 && len(addresses) == limit {
+		lastAddr := addresses[len(addresses)-1]
+		score, err := r.client.ZScore(ctx, aliveSetKey, lastAddr).Result()
+		if err == nil {
+			nextCursor = score
+		}
+	}
+
+	return proxies, nextCursor, int(total), nil
 }
 
-// Compile-time checks
 var (
 	_ proxy.Writer = (*Repository)(nil)
 	_ proxy.Reader = (*Repository)(nil)

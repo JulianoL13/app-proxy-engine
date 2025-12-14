@@ -21,14 +21,16 @@ type ProxyChecker interface {
 	Check(ctx context.Context, proxies []*Proxy) <-chan CheckStreamResult
 }
 
-// Writer persists verified proxies
 type Writer interface {
 	Save(ctx context.Context, p *Proxy) error
 }
 
-// Reader retrieves stored proxies
 type Reader interface {
-	GetAlive(ctx context.Context) ([]*Proxy, error)
+	// GetAlive returns alive proxies with cursor-based pagination.
+	// cursor is the last seen score (0 for first page).
+	// limit is max results (0 = all).
+	// Returns: proxies, nextCursor, total, error
+	GetAlive(ctx context.Context, cursor float64, limit int) ([]*Proxy, float64, int, error)
 }
 
 type CheckOutput struct {
