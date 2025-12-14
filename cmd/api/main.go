@@ -60,7 +60,7 @@ func getEnvInt(key string, fallback int) int {
 func main() {
 	cfg := loadConfig()
 
-	logger := slog.New(logslog.LevelInfo)
+	logger := slog.NewJSON(logslog.LevelInfo)
 	logger.Info("starting proxy-engine API", "port", cfg.APIPort)
 
 	redisClient := redis.NewClient(&redis.Options{

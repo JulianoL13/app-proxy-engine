@@ -14,6 +14,7 @@ func NewRouter(h *Handler, logger logs.Logger) http.Handler {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(LoggerMiddleware(logger))
+	r.Use(RequestLoggerMiddleware(logger))
 	r.Use(middleware.Recoverer)
 
 	r.Get("/health", h.Health)
