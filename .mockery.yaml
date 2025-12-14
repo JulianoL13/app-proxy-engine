@@ -16,5 +16,16 @@ packages:
     interfaces:
       Fetcher:
         config: {}
+  github.com/JulianoL13/app-proxy-engine/internal/proxy:
+    config:
+      dir: internal/proxy/mocks
+      outpkg: mocks
+    interfaces:
+      ProxyDataInput:
+        config: {}
+      ProxySource:
+        config: {}
+      ProxyChecker:
+        config: {}
 mockname: "{{.InterfaceName}}"
 filename: "{{.InterfaceName}}.go"
