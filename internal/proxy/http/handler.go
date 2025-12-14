@@ -13,7 +13,7 @@ import (
 )
 
 type Reader interface {
-	GetAlive(ctx context.Context) ([]*proxy.Proxy, error)
+	GetAlive(ctx context.Context, cursor float64, limit int) ([]*proxy.Proxy, float64, int, error)
 }
 
 type Handler struct {
@@ -57,6 +57,35 @@ type ProxyFilter struct {
 	Protocol   string
 	Anonymity  string
 	MaxLatency time.Duration
+}
+
+type PaginatedResponse struct {
+	Data       []ProxyResponse `json:"data"`
+	NextCursor *float64        `json:"next_cursor,omitempty"`
+	Limit      int             `json:"limit"`
+	TotalCount int             `json:"total_count"`
+}
+
+const defaultLimit = 50
+
+func parsePagination(r *http.Request) (cursor float64, limit int) {
+	q := r.URL.Query()
+
+	limit = defaultLimit
+
+	if c := q.Get("cursor"); c != "" {
+		if val, err := strconv.ParseFloat(c, 64); err == nil && val >= 0 {
+			cursor = val
+		}
+	}
+
+	if l := q.Get("limit"); l != "" {
+		if val, err := strconv.Atoi(l); err == nil && val > 0 {
+			limit = val
+		}
+	}
+
+	return cursor, limit
 }
 
 func parseFilters(r *http.Request) ProxyFilter {
@@ -106,7 +135,9 @@ func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetProxies(w http.ResponseWriter, r *http.Request) {
 	logger := h.getLogger(r)
 
-	proxies, err := h.reader.GetAlive(r.Context())
+	cursor, limit := parsePagination(r)
+
+	proxies, nextCursor, total, err := h.reader.GetAlive(r.Context(), cursor, limit)
 	if err != nil {
 		logger.Error("failed to get proxies", "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -116,9 +147,20 @@ func (h *Handler) GetProxies(w http.ResponseWriter, r *http.Request) {
 	filters := parseFilters(r)
 	proxies = filterProxies(proxies, filters)
 
-	response := make([]ProxyResponse, len(proxies))
+	data := make([]ProxyResponse, len(proxies))
 	for i, p := range proxies {
-		response[i] = toResponse(p)
+		data[i] = toResponse(p)
+	}
+
+	response := PaginatedResponse{
+		Data:       data,
+		Limit:      limit,
+		TotalCount: total,
+	}
+
+	// Only include next_cursor if there's more data
+	if nextCursor > 0 {
+		response.NextCursor = &nextCursor
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -128,7 +170,8 @@ func (h *Handler) GetProxies(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetRandomProxy(w http.ResponseWriter, r *http.Request) {
 	logger := h.getLogger(r)
 
-	proxies, err := h.reader.GetAlive(r.Context())
+	// Get all proxies (no pagination for random selection)
+	proxies, _, _, err := h.reader.GetAlive(r.Context(), 0, 0)
 	if err != nil {
 		logger.Error("failed to get proxies", "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
