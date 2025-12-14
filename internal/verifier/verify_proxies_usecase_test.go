@@ -30,7 +30,7 @@ func TestVerifyProxiesUseCase_Execute(t *testing.T) {
 		expectedResult := verifier.VerifyOutput{
 			Success:   true,
 			Latency:   100 * time.Millisecond,
-			Anonymity: verifier.Elite,
+			Anonymity: "elite",
 		}
 
 		mockChecker.On("Verify", mock.Anything, proxy1).Return(expectedResult)

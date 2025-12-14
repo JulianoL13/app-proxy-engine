@@ -5,14 +5,6 @@ import (
 	"time"
 )
 
-type AnonymityLevel string
-
-const (
-	Elite       AnonymityLevel = "Elite"
-	Anonymous   AnonymityLevel = "Anonymous"
-	Transparent AnonymityLevel = "Transparent"
-)
-
 type Verifiable interface {
 	Address() string
 	URL() *url.URL
@@ -21,6 +13,6 @@ type Verifiable interface {
 type VerifyOutput struct {
 	Success   bool
 	Latency   time.Duration
-	Anonymity AnonymityLevel
+	Anonymity string
 	Error     error
 }

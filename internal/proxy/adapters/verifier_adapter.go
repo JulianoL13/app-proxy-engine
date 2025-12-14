@@ -29,9 +29,10 @@ func (a *VerifierAdapter) Check(ctx context.Context, proxies []*proxy.Proxy) <-c
 			results <- proxy.CheckStreamResult{
 				Address: r.Address,
 				Output: proxy.CheckOutput{
-					Success: r.Output.Success,
-					Latency: r.Output.Latency.Milliseconds(),
-					Error:   r.Output.Error,
+					Success:   r.Output.Success,
+					Latency:   r.Output.Latency.Milliseconds(),
+					Anonymity: proxy.AnonymityLevelFromString(r.Output.Anonymity),
+					Error:     r.Output.Error,
 				},
 			}
 		}

@@ -22,9 +22,10 @@ type ProxyChecker interface {
 }
 
 type CheckOutput struct {
-	Success bool
-	Latency int64
-	Error   error
+	Success   bool
+	Latency   int64
+	Anonymity AnonymityLevel
+	Error     error
 }
 
 type CheckStreamResult struct {
@@ -83,7 +84,7 @@ func (uc *CollectProxiesUseCase) Execute(ctx context.Context) (<-chan *Proxy, er
 			}
 
 			if r.Output.Success {
-				p.MarkSuccess(0, Unknown)
+				p.MarkSuccess(0, r.Output.Anonymity)
 				alive++
 				results <- p
 			} else {

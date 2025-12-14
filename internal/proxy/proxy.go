@@ -24,6 +24,19 @@ const (
 	Unknown     AnonymityLevel = "unknown"
 )
 
+func AnonymityLevelFromString(s string) AnonymityLevel {
+	switch s {
+	case "elite":
+		return Elite
+	case "anonymous":
+		return Anonymous
+	case "transparent":
+		return Transparent
+	default:
+		return Unknown
+	}
+}
+
 type Proxy struct {
 	IP            string
 	Port          int
