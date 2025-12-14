@@ -26,6 +26,11 @@ type Writer interface {
 	Save(ctx context.Context, p *Proxy) error
 }
 
+// Reader retrieves stored proxies
+type Reader interface {
+	GetAlive(ctx context.Context) ([]*Proxy, error)
+}
+
 type CheckOutput struct {
 	Success   bool
 	Latency   int64

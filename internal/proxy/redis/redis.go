@@ -56,5 +56,50 @@ func (r *Repository) Save(ctx context.Context, p *proxy.Proxy) error {
 	return nil
 }
 
-// Compile-time check
-var _ proxy.Writer = (*Repository)(nil)
+func (r *Repository) GetAlive(ctx context.Context) ([]*proxy.Proxy, error) {
+	addresses, err := r.client.SMembers(ctx, aliveSetKey).Result()
+	if err != nil {
+		return nil, fmt.Errorf("get alive set: %w", err)
+	}
+
+	if len(addresses) == 0 {
+		return nil, nil
+	}
+
+	keys := make([]string, len(addresses))
+	for i, addr := range addresses {
+		keys[i] = proxyKeyPrefix + addr
+	}
+
+	values, err := r.client.MGet(ctx, keys...).Result()
+	if err != nil {
+		return nil, fmt.Errorf("mget proxies: %w", err)
+	}
+
+	proxies := make([]*proxy.Proxy, 0, len(values))
+	for _, v := range values {
+		if v == nil {
+			continue
+		}
+
+		str, ok := v.(string)
+		if !ok {
+			continue
+		}
+
+		var p proxy.Proxy
+		if err := json.Unmarshal([]byte(str), &p); err != nil {
+			continue
+		}
+
+		proxies = append(proxies, &p)
+	}
+
+	return proxies, nil
+}
+
+// Compile-time checks
+var (
+	_ proxy.Writer = (*Repository)(nil)
+	_ proxy.Reader = (*Repository)(nil)
+)
