@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	logmocks "github.com/JulianoL13/app-proxy-engine/internal/common/logs/mocks"
 	"github.com/JulianoL13/app-proxy-engine/internal/scraper"
 	"github.com/JulianoL13/app-proxy-engine/internal/scraper/mocks"
 	"github.com/stretchr/testify/assert"
@@ -13,50 +14,49 @@ import (
 )
 
 func TestScrapeProxiesUseCase_Execute(t *testing.T) {
-	// Setup
-	mockFetcher := mocks.NewFetcher(t)
-	sources := []scraper.Source{
-		{Name: "Source1", URL: "http://source1.com", Type: "http"},
-		{Name: "Source2", URL: "http://source2.com", Type: "http"},
-	}
-	useCase := scraper.NewScrapeProxiesUseCase(mockFetcher, sources)
+	ctx := context.Background()
 
-	proxy1 := &scraper.ScrapedProxy{IP: "1.1.1.1", Port: 8080, Protocol: "http"}
-	proxy2 := &scraper.ScrapedProxy{IP: "2.2.2.2", Port: 8080, Protocol: "http"}
-	proxyDuplicate := &scraper.ScrapedProxy{IP: "1.1.1.1", Port: 8080, Protocol: "http"} // Same as proxy1
+	t.Run("success with deduplication", func(t *testing.T) {
+		mockFetcher := mocks.NewFetcher(t)
 
-	mockFetcher.On("FetchAndParse", mock.Anything, sources[0]).Return([]*scraper.ScrapedProxy{proxy1}, nil)
-	mockFetcher.On("FetchAndParse", mock.Anything, sources[1]).Return([]*scraper.ScrapedProxy{proxy2, proxyDuplicate}, nil)
+		sources := []scraper.Source{
+			{Name: "Source1", URL: "http://source1.com", Type: "http"},
+			{Name: "Source2", URL: "http://source2.com", Type: "http"},
+		}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+		proxy1 := scraper.NewScrapeOutput("1.1.1.1", 8080, "http", "test")
+		proxy2 := scraper.NewScrapeOutput("2.2.2.2", 8080, "http", "test")
+		proxyDuplicate := scraper.NewScrapeOutput("1.1.1.1", 8080, "http", "test")
 
-	result, err := useCase.Execute(ctx)
+		mockFetcher.On("FetchAndParse", mock.Anything, sources[0]).Return([]*scraper.ScrapeOutput{proxy1}, nil)
+		mockFetcher.On("FetchAndParse", mock.Anything, sources[1]).Return([]*scraper.ScrapeOutput{proxy2, proxyDuplicate}, nil)
 
-	assert.NoError(t, err)
-	assert.Len(t, result, 2, "Should have 2 unique proxies")
+		uc := scraper.NewScrapeProxiesUseCase(mockFetcher, sources, logmocks.LoggerMock{})
 
-	ips := make(map[string]bool)
-	for _, p := range result {
-		ips[p.IP] = true
-	}
-	assert.True(t, ips["1.1.1.1"])
-	assert.True(t, ips["2.2.2.2"])
+		timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
 
-	mockFetcher.AssertExpectations(t)
-}
+		result, errs := uc.Execute(timeoutCtx)
 
-func TestScrapeProxiesUseCase_Execute_ErrorHandling(t *testing.T) {
-	mockFetcher := mocks.NewFetcher(t)
-	sources := []scraper.Source{
-		{Name: "Source1", URL: "http://source1.com", Type: "http"},
-	}
-	useCase := scraper.NewScrapeProxiesUseCase(mockFetcher, sources)
+		assert.Empty(t, errs)
+		assert.Len(t, result, 2, "Should have 2 unique proxies")
+		mockFetcher.AssertExpectations(t)
+	})
 
-	mockFetcher.On("FetchAndParse", mock.Anything, sources[0]).Return(nil, errors.New("network error"))
+	t.Run("handles fetcher error", func(t *testing.T) {
+		mockFetcher := mocks.NewFetcher(t)
 
-	result, err := useCase.Execute(context.Background())
+		sources := []scraper.Source{
+			{Name: "Source1", URL: "http://source1.com", Type: "http"},
+		}
 
-	assert.NoError(t, err)
-	assert.Empty(t, result)
+		mockFetcher.On("FetchAndParse", mock.Anything, sources[0]).Return(nil, errors.New("network error"))
+
+		uc := scraper.NewScrapeProxiesUseCase(mockFetcher, sources, logmocks.LoggerMock{})
+		result, errs := uc.Execute(ctx)
+
+		assert.Len(t, errs, 1)
+		assert.Empty(t, result)
+		mockFetcher.AssertExpectations(t)
+	})
 }

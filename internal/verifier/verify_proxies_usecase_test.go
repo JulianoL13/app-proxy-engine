@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	logmocks "github.com/JulianoL13/app-proxy-engine/internal/common/logs/mocks"
 	"github.com/JulianoL13/app-proxy-engine/internal/verifier"
 	"github.com/JulianoL13/app-proxy-engine/internal/verifier/mocks"
 	"github.com/stretchr/testify/assert"
@@ -12,39 +13,55 @@ import (
 )
 
 func TestVerifyProxiesUseCase_Execute(t *testing.T) {
-	mockChecker := mocks.NewProxyChecker(t)
-	useCase := verifier.NewVerifyProxiesUseCase(mockChecker, 2)
+	ctx := context.Background()
 
-	proxy1 := mocks.NewVerifiable(t)
-	proxy1.On("Address").Return("1.1.1.1:8080")
+	t.Run("success with multiple proxies", func(t *testing.T) {
+		mockChecker := mocks.NewProxyChecker(t)
 
-	proxy2 := mocks.NewVerifiable(t)
-	proxy2.On("Address").Return("2.2.2.2:8080")
+		proxy1 := mocks.NewVerifiable(t)
+		proxy1.On("Address").Return("1.1.1.1:8080")
 
-	proxy3 := mocks.NewVerifiable(t)
-	proxy3.On("Address").Return("3.3.3.3:8080")
+		proxy2 := mocks.NewVerifiable(t)
+		proxy2.On("Address").Return("2.2.2.2:8080")
 
-	proxies := []verifier.Verifiable{proxy1, proxy2, proxy3}
+		proxies := []verifier.Verifiable{proxy1, proxy2}
 
-	expectedResultSuccess := verifier.Result{
-		Success:   true,
-		Latency:   100 * time.Millisecond,
-		Anonymity: verifier.Elite,
-	}
+		expectedResult := verifier.VerifyOutput{
+			Success:   true,
+			Latency:   100 * time.Millisecond,
+			Anonymity: verifier.Elite,
+		}
 
-	expectedResultFail := verifier.Result{
-		Success: false,
-		Error:   assert.AnError,
-	}
+		mockChecker.On("Verify", mock.Anything, proxy1).Return(expectedResult)
+		mockChecker.On("Verify", mock.Anything, proxy2).Return(expectedResult)
 
-	mockChecker.On("Verify", mock.Anything, proxy1).Return(expectedResultSuccess)
-	mockChecker.On("Verify", mock.Anything, proxy2).Return(expectedResultFail)
-	mockChecker.On("Verify", mock.Anything, proxy3).Return(expectedResultSuccess)
+		uc := verifier.NewVerifyProxiesUseCase(mockChecker, 2, logmocks.LoggerMock{})
+		results := uc.Execute(ctx, proxies)
 
-	results := useCase.Execute(context.Background(), proxies)
+		assert.Len(t, results, 2)
+		assert.Equal(t, expectedResult, results["1.1.1.1:8080"])
+		assert.Equal(t, expectedResult, results["2.2.2.2:8080"])
+		mockChecker.AssertExpectations(t)
+	})
 
-	assert.Len(t, results, 3)
-	assert.Equal(t, expectedResultSuccess, results["1.1.1.1:8080"])
-	assert.Equal(t, expectedResultFail, results["2.2.2.2:8080"])
-	assert.Equal(t, expectedResultSuccess, results["3.3.3.3:8080"])
+	t.Run("handles verification failure", func(t *testing.T) {
+		mockChecker := mocks.NewProxyChecker(t)
+
+		proxy := mocks.NewVerifiable(t)
+		proxy.On("Address").Return("3.3.3.3:8080")
+
+		failedResult := verifier.VerifyOutput{
+			Success: false,
+			Error:   assert.AnError,
+		}
+
+		mockChecker.On("Verify", mock.Anything, proxy).Return(failedResult)
+
+		uc := verifier.NewVerifyProxiesUseCase(mockChecker, 1, logmocks.LoggerMock{})
+		results := uc.Execute(ctx, []verifier.Verifiable{proxy})
+
+		assert.Len(t, results, 1)
+		assert.False(t, results["3.3.3.3:8080"].Success)
+		mockChecker.AssertExpectations(t)
+	})
 }
