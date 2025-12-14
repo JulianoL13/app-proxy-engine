@@ -24,5 +24,9 @@
 tmp/
 dist/
 bin/
+build/
+
+# Environment
+.env
 
 .agent/

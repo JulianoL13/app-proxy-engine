@@ -1,0 +1,34 @@
+### Proxy Engine API - REST Client requests
+### Use with VS Code REST Client extension or similar
+
+@baseUrl = http://localhost:8080
+
+### Health Check
+GET {{baseUrl}}/health
+
+### List All Proxies
+GET {{baseUrl}}/proxies
+
+### List HTTP Proxies Only
+GET {{baseUrl}}/proxies?protocol=http
+
+### List SOCKS5 Proxies Only
+GET {{baseUrl}}/proxies?protocol=socks5
+
+### List Elite Anonymity Proxies
+GET {{baseUrl}}/proxies?anonymity=elite
+
+### List Fast Proxies (max 150ms latency)
+GET {{baseUrl}}/proxies?max_latency_ms=150
+
+### Combined Filters
+GET {{baseUrl}}/proxies?protocol=http&anonymity=elite&max_latency_ms=200
+
+### Get Random Proxy
+GET {{baseUrl}}/proxies/random
+
+### Get Random HTTP Proxy
+GET {{baseUrl}}/proxies/random?protocol=http
+
+### Get Random Elite Proxy
+GET {{baseUrl}}/proxies/random?anonymity=elite
