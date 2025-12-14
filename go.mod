@@ -3,6 +3,8 @@ module github.com/JulianoL13/app-proxy-engine
 go 1.24.11
 
 require (
+	github.com/go-chi/chi/v5 v5.2.3
+	github.com/joho/godotenv v1.5.1
 	github.com/panjf2000/ants/v2 v2.11.3
 	github.com/redis/go-redis/v9 v9.17.2
 	github.com/stretchr/testify v1.11.1
@@ -28,7 +30,6 @@ require (
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/ebitengine/purego v0.8.4 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
-	github.com/go-chi/chi/v5 v5.2.3 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect

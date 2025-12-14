@@ -12,7 +12,6 @@ import (
 	"github.com/JulianoL13/app-proxy-engine/internal/proxy"
 )
 
-// Reader defines what the handler needs from storage
 type Reader interface {
 	GetAlive(ctx context.Context) ([]*proxy.Proxy, error)
 }
@@ -29,7 +28,6 @@ func NewHandler(reader Reader, logger logs.Logger) *Handler {
 	}
 }
 
-// ProxyResponse is the JSON representation of a proxy
 type ProxyResponse struct {
 	Address   string `json:"address"`
 	Protocol  string `json:"protocol"`
@@ -48,7 +46,6 @@ func toResponse(p *proxy.Proxy) ProxyResponse {
 	}
 }
 
-// ProxyFilter holds query parameters for filtering
 type ProxyFilter struct {
 	Protocol   string
 	Anonymity  string
@@ -94,14 +91,11 @@ func filterProxies(proxies []*proxy.Proxy, f ProxyFilter) []*proxy.Proxy {
 	return result
 }
 
-// Health returns service health status
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
-// GetProxies returns alive proxies with optional filters
-// Query params: protocol, anonymity, max_latency_ms
 func (h *Handler) GetProxies(w http.ResponseWriter, r *http.Request) {
 	proxies, err := h.reader.GetAlive(r.Context())
 	if err != nil {
@@ -122,8 +116,6 @@ func (h *Handler) GetProxies(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// GetRandomProxy returns a random alive proxy matching filters
-// Query params: protocol, anonymity, max_latency_ms
 func (h *Handler) GetRandomProxy(w http.ResponseWriter, r *http.Request) {
 	proxies, err := h.reader.GetAlive(r.Context())
 	if err != nil {
