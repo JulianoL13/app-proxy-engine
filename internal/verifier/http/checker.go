@@ -13,6 +13,8 @@ import (
 	"github.com/JulianoL13/app-proxy-engine/internal/verifier"
 )
 
+const DefaultVerifyURL = "https://httpbin.org/ip"
+
 type Checker struct {
 	TargetURL string
 	Timeout   time.Duration
@@ -21,6 +23,9 @@ type Checker struct {
 }
 
 func NewChecker(target string, timeout time.Duration, logger logs.Logger) *Checker {
+	if target == "" {
+		target = DefaultVerifyURL
+	}
 	c := &Checker{
 		TargetURL: target,
 		Timeout:   timeout,
@@ -34,7 +39,7 @@ func (c *Checker) fetchRealIP() string {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://httpbin.org/ip", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", c.TargetURL, nil)
 	if err != nil {
 		c.logger.Warn("failed to create request for real IP", "error", err)
 		return ""
@@ -77,7 +82,7 @@ func (c *Checker) Verify(ctx context.Context, p verifier.Verifiable) verifier.Ve
 	reqCtx, cancel := context.WithTimeout(ctx, c.Timeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(reqCtx, "GET", "https://httpbin.org/headers", nil)
+	req, err := http.NewRequestWithContext(reqCtx, "GET", c.TargetURL, nil)
 	if err != nil {
 		return verifier.VerifyOutput{Error: err}
 	}
@@ -90,7 +95,6 @@ func (c *Checker) Verify(ctx context.Context, p verifier.Verifiable) verifier.Ve
 	if err != nil {
 		c.logger.Debug("proxy verification failed", "address", p.Address(), "error", err)
 
-		// Wrap with context and appropriate sentinel
 		wrappedErr := fmt.Errorf("proxy %s: %w", p.Address(), err)
 		if ctx.Err() == context.DeadlineExceeded || reqCtx.Err() == context.DeadlineExceeded {
 			wrappedErr = fmt.Errorf("proxy %s: %w", p.Address(), verifier.ErrProxyTimeout)
