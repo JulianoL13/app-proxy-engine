@@ -15,21 +15,27 @@ func NewVerifierAdapter(uc *verifier.VerifyProxiesUseCase) *VerifierAdapter {
 	return &VerifierAdapter{usecase: uc}
 }
 
-func (a *VerifierAdapter) Check(ctx context.Context, proxies []*proxy.Proxy) map[string]proxy.CheckOutput {
+func (a *VerifierAdapter) Check(ctx context.Context, proxies []*proxy.Proxy) <-chan proxy.CheckStreamResult {
+	results := make(chan proxy.CheckStreamResult)
+
 	verifiables := make([]verifier.Verifiable, len(proxies))
 	for i, p := range proxies {
 		verifiables[i] = p
 	}
 
-	results := a.usecase.Execute(ctx, verifiables)
-	output := make(map[string]proxy.CheckOutput)
-	for addr, r := range results {
-		output[addr] = proxy.CheckOutput{
-			Success: r.Success,
-			Latency: r.Latency.Milliseconds(),
-			Error:   r.Error,
+	go func() {
+		defer close(results)
+		for r := range a.usecase.Execute(ctx, verifiables) {
+			results <- proxy.CheckStreamResult{
+				Address: r.Address,
+				Output: proxy.CheckOutput{
+					Success: r.Output.Success,
+					Latency: r.Output.Latency.Milliseconds(),
+					Error:   r.Output.Error,
+				},
+			}
 		}
-	}
+	}()
 
-	return output
+	return results
 }

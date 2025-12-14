@@ -6,8 +6,6 @@ import (
 	"github.com/JulianoL13/app-proxy-engine/internal/common/logs"
 )
 
-// Interfaces definidas pelo cliente (este UseCase)
-
 type ProxyDataInput interface {
 	IP() string
 	Port() int
@@ -20,7 +18,7 @@ type ProxySource interface {
 }
 
 type ProxyChecker interface {
-	Check(ctx context.Context, proxies []*Proxy) map[string]CheckOutput
+	Check(ctx context.Context, proxies []*Proxy) <-chan CheckStreamResult
 }
 
 type CheckOutput struct {
@@ -29,7 +27,10 @@ type CheckOutput struct {
 	Error   error
 }
 
-// UseCase
+type CheckStreamResult struct {
+	Address string
+	Output  CheckOutput
+}
 
 type CollectProxiesUseCase struct {
 	source  ProxySource
@@ -45,7 +46,7 @@ func NewCollectProxiesUseCase(source ProxySource, checker ProxyChecker, logger l
 	}
 }
 
-func (uc *CollectProxiesUseCase) Execute(ctx context.Context) ([]*Proxy, error) {
+func (uc *CollectProxiesUseCase) Execute(ctx context.Context) (<-chan *Proxy, error) {
 	uc.logger.Info("starting proxy collection")
 
 	data, errs := uc.source.Fetch(ctx)
@@ -55,30 +56,44 @@ func (uc *CollectProxiesUseCase) Execute(ctx context.Context) ([]*Proxy, error) 
 	uc.logger.Info("fetched proxies", "count", len(data))
 
 	if len(data) == 0 {
-		return nil, nil
+		ch := make(chan *Proxy)
+		close(ch)
+		return ch, nil
 	}
 
 	proxies := make([]*Proxy, len(data))
+	proxyMap := make(map[string]*Proxy)
 	for i, d := range data {
 		proxies[i] = NewProxy(d.IP(), d.Port(), Protocol(d.Protocol()), d.Source())
+		proxyMap[proxies[i].Address()] = proxies[i]
 	}
 
-	results := uc.checker.Check(ctx, proxies)
+	results := make(chan *Proxy)
 
-	alive := make([]*Proxy, 0)
-	for _, p := range proxies {
-		result, ok := results[p.Address()]
-		if !ok {
-			continue
-		}
-		if result.Success {
-			p.MarkSuccess(0, Unknown)
-			alive = append(alive, p)
-		} else {
-			p.MarkFailure()
-		}
-	}
+	go func() {
+		defer close(results)
 
-	uc.logger.Info("collection complete", "alive", len(alive), "dead", len(proxies)-len(alive))
-	return alive, nil
+		alive := 0
+		dead := 0
+
+		for r := range uc.checker.Check(ctx, proxies) {
+			p, ok := proxyMap[r.Address]
+			if !ok {
+				continue
+			}
+
+			if r.Output.Success {
+				p.MarkSuccess(0, Unknown)
+				alive++
+				results <- p
+			} else {
+				p.MarkFailure()
+				dead++
+			}
+		}
+
+		uc.logger.Info("collection complete", "alive", alive, "dead", dead)
+	}()
+
+	return results, nil
 }
