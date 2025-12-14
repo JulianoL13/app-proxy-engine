@@ -82,7 +82,7 @@ func main() {
 	repo := proxyredis.NewRepository(redisClient).WithTTL(cfg.ProxyTTL)
 
 	handler := proxyhttp.NewHandler(repo, logger)
-	router := proxyhttp.NewRouter(handler)
+	router := proxyhttp.NewRouter(handler, logger)
 
 	server := &http.Server{
 		Addr:         ":" + cfg.APIPort,

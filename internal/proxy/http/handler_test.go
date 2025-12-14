@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// MockReader implements http.Reader for testing
 type MockReader struct {
 	proxies []*proxy.Proxy
 	err     error
@@ -27,7 +26,7 @@ func (m *MockReader) GetAlive(ctx context.Context) ([]*proxy.Proxy, error) {
 
 func TestHandler_Health(t *testing.T) {
 	handler := proxyhttp.NewHandler(&MockReader{}, logmocks.LoggerMock{})
-	router := proxyhttp.NewRouter(handler)
+	router := proxyhttp.NewRouter(handler, logmocks.LoggerMock{})
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
@@ -47,7 +46,7 @@ func TestHandler_GetProxies(t *testing.T) {
 
 	reader := &MockReader{proxies: []*proxy.Proxy{p1, p2}}
 	handler := proxyhttp.NewHandler(reader, logmocks.LoggerMock{})
-	router := proxyhttp.NewRouter(handler)
+	router := proxyhttp.NewRouter(handler, logmocks.LoggerMock{})
 
 	t.Run("returns all proxies", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/proxies", nil)
@@ -111,7 +110,7 @@ func TestHandler_GetRandomProxy(t *testing.T) {
 	t.Run("returns a proxy", func(t *testing.T) {
 		reader := &MockReader{proxies: []*proxy.Proxy{p1}}
 		handler := proxyhttp.NewHandler(reader, logmocks.LoggerMock{})
-		router := proxyhttp.NewRouter(handler)
+		router := proxyhttp.NewRouter(handler, logmocks.LoggerMock{})
 
 		req := httptest.NewRequest(http.MethodGet, "/proxies/random", nil)
 		rec := httptest.NewRecorder()
@@ -130,7 +129,7 @@ func TestHandler_GetRandomProxy(t *testing.T) {
 	t.Run("returns 404 when no proxies", func(t *testing.T) {
 		reader := &MockReader{proxies: []*proxy.Proxy{}}
 		handler := proxyhttp.NewHandler(reader, logmocks.LoggerMock{})
-		router := proxyhttp.NewRouter(handler)
+		router := proxyhttp.NewRouter(handler, logmocks.LoggerMock{})
 
 		req := httptest.NewRequest(http.MethodGet, "/proxies/random", nil)
 		rec := httptest.NewRecorder()
@@ -146,7 +145,7 @@ func TestHandler_GetRandomProxy(t *testing.T) {
 
 		reader := &MockReader{proxies: []*proxy.Proxy{p1, p2}}
 		handler := proxyhttp.NewHandler(reader, logmocks.LoggerMock{})
-		router := proxyhttp.NewRouter(handler)
+		router := proxyhttp.NewRouter(handler, logmocks.LoggerMock{})
 
 		req := httptest.NewRequest(http.MethodGet, "/proxies/random?protocol=socks5", nil)
 		rec := httptest.NewRecorder()

@@ -3,20 +3,19 @@ package http
 import (
 	"net/http"
 
+	"github.com/JulianoL13/app-proxy-engine/internal/common/logs"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-// NewRouter creates the HTTP router with all routes configured
-func NewRouter(h *Handler) http.Handler {
+func NewRouter(h *Handler, logger logs.Logger) http.Handler {
 	r := chi.NewRouter()
 
-	// Middleware
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
 	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
+	r.Use(LoggerMiddleware(logger))
+	r.Use(middleware.Recoverer)
 
-	// Routes
 	r.Get("/health", h.Health)
 	r.Get("/proxies", h.GetProxies)
 	r.Get("/proxies/random", h.GetRandomProxy)

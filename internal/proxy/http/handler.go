@@ -28,6 +28,13 @@ func NewHandler(reader Reader, logger logs.Logger) *Handler {
 	}
 }
 
+func (h *Handler) getLogger(r *http.Request) logs.Logger {
+	if l := LoggerFromContext(r.Context()); l != nil {
+		return l
+	}
+	return h.logger
+}
+
 type ProxyResponse struct {
 	Address   string `json:"address"`
 	Protocol  string `json:"protocol"`
@@ -97,9 +104,11 @@ func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetProxies(w http.ResponseWriter, r *http.Request) {
+	logger := h.getLogger(r)
+
 	proxies, err := h.reader.GetAlive(r.Context())
 	if err != nil {
-		h.logger.Error("failed to get proxies", "error", err)
+		logger.Error("failed to get proxies", "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
@@ -117,9 +126,11 @@ func (h *Handler) GetProxies(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetRandomProxy(w http.ResponseWriter, r *http.Request) {
+	logger := h.getLogger(r)
+
 	proxies, err := h.reader.GetAlive(r.Context())
 	if err != nil {
-		h.logger.Error("failed to get proxies", "error", err)
+		logger.Error("failed to get proxies", "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
