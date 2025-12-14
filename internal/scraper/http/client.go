@@ -4,30 +4,39 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/JulianoL13/app-proxy-engine/internal/common/logs"
 	"github.com/JulianoL13/app-proxy-engine/internal/scraper"
 )
 
-// Fetcher implementation for HTTP.
 type Fetcher struct {
 	client *http.Client
+	logger logs.Logger
 }
 
-func New() *Fetcher {
+func New(logger logs.Logger) *Fetcher {
 	return &Fetcher{
 		client: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: 0,
+			Transport: &http.Transport{
+				MaxIdleConns:        100,
+				MaxIdleConnsPerHost: 10,
+				IdleConnTimeout:     90 * time.Second,
+			},
 		},
+		logger: logger,
 	}
 }
 
-// FetchAndParse downloads a source and converts it to Proxy structs.
-func (f *Fetcher) FetchAndParse(ctx context.Context, source scraper.Source) ([]*scraper.ScrapedProxy, error) {
+func (f *Fetcher) FetchAndParse(ctx context.Context, source scraper.Source) ([]*scraper.ScrapeOutput, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", source.URL, nil)
+	req.Header.Set("User-Agent", "ProxyEngine/1.0")
+
 	if err != nil {
 		return nil, fmt.Errorf("bad request: %w", err)
 	}
@@ -42,19 +51,24 @@ func (f *Fetcher) FetchAndParse(ctx context.Context, source scraper.Source) ([]*
 		return nil, fmt.Errorf("bad status: %d", resp.StatusCode)
 	}
 
-	var proxies []*scraper.ScrapedProxy
+	var proxies []*scraper.ScrapeOutput
 	scanner := bufio.NewScanner(resp.Body)
-
 	for scanner.Scan() {
+		if ctx.Err() != nil {
+			return proxies, ctx.Err()
+		}
+
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
 
 		p, err := parseLine(line, source)
-		if err == nil {
-			proxies = append(proxies, p)
+		if err != nil {
+			f.logger.Debug("parse error", "line", line, "error", err)
+			continue
 		}
+		proxies = append(proxies, p)
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -64,17 +78,17 @@ func (f *Fetcher) FetchAndParse(ctx context.Context, source scraper.Source) ([]*
 	return proxies, nil
 }
 
-func parseLine(line string, source scraper.Source) (*scraper.ScrapedProxy, error) {
+func parseLine(line string, source scraper.Source) (*scraper.ScrapeOutput, error) {
 	parts := strings.Split(line, ":")
 	if len(parts) != 2 {
 		return nil, fmt.Errorf("invalid format")
 	}
 
-	ip := parts[0]
-	portStr := parts[1]
+	ip := strings.TrimSpace(parts[0])
+	portStr := strings.TrimSpace(parts[1])
 
-	if strings.Count(ip, ".") != 3 {
-		return nil, fmt.Errorf("invalid ip")
+	if net.ParseIP(ip) == nil {
+		return nil, fmt.Errorf("invalid ip: %s", ip)
 	}
 
 	port, err := strconv.Atoi(portStr)
@@ -82,10 +96,5 @@ func parseLine(line string, source scraper.Source) (*scraper.ScrapedProxy, error
 		return nil, fmt.Errorf("invalid port")
 	}
 
-	return &scraper.ScrapedProxy{
-		IP:       ip,
-		Port:     port,
-		Protocol: source.Type,
-		Source:   source.Name,
-	}, nil
+	return scraper.NewScrapeOutput(ip, port, source.Type, source.Name), nil
 }

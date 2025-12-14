@@ -6,22 +6,25 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/JulianoL13/app-proxy-engine/internal/common/logs"
 	"github.com/JulianoL13/app-proxy-engine/internal/verifier"
 )
 
 type Checker struct {
 	TargetURL string
 	Timeout   time.Duration
+	logger    logs.Logger
 }
 
-func NewChecker(target string, timeout time.Duration) *Checker {
+func NewChecker(target string, timeout time.Duration, logger logs.Logger) *Checker {
 	return &Checker{
 		TargetURL: target,
 		Timeout:   timeout,
+		logger:    logger,
 	}
 }
 
-func (c *Checker) Verify(ctx context.Context, p verifier.Verifiable) verifier.Result {
+func (c *Checker) Verify(ctx context.Context, p verifier.Verifiable) verifier.VerifyOutput {
 	proxyURL := p.URL()
 
 	transport := &http.Transport{
@@ -41,7 +44,7 @@ func (c *Checker) Verify(ctx context.Context, p verifier.Verifiable) verifier.Re
 
 	req, err := http.NewRequestWithContext(reqCtx, "GET", c.TargetURL, nil)
 	if err != nil {
-		return verifier.Result{Error: err}
+		return verifier.VerifyOutput{Error: err}
 	}
 
 	req.Header.Set("User-Agent", "ProxyEngine/1.0")
@@ -50,7 +53,7 @@ func (c *Checker) Verify(ctx context.Context, p verifier.Verifiable) verifier.Re
 	latency := time.Since(start)
 
 	if err != nil {
-		return verifier.Result{
+		return verifier.VerifyOutput{
 			Success: false,
 			Latency: latency,
 			Error:   err,
@@ -59,14 +62,14 @@ func (c *Checker) Verify(ctx context.Context, p verifier.Verifiable) verifier.Re
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return verifier.Result{
+		return verifier.VerifyOutput{
 			Success: false,
 			Latency: latency,
 			Error:   fmt.Errorf("bad status code: %d", resp.StatusCode),
 		}
 	}
 	// TODO: Parse body to check for real IP leak (Anonymity Check)
-	return verifier.Result{
+	return verifier.VerifyOutput{
 		Success:   true,
 		Latency:   latency,
 		Anonymity: verifier.Elite,

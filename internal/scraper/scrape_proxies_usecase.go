@@ -5,27 +5,34 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/JulianoL13/app-proxy-engine/internal/common/logs"
 )
 
 type Fetcher interface {
-	FetchAndParse(ctx context.Context, source Source) ([]*ScrapedProxy, error)
+	FetchAndParse(ctx context.Context, source Source) ([]*ScrapeOutput, error)
 }
 
 type ScrapeProxiesUseCase struct {
 	fetcher Fetcher
 	sources []Source
+	logger  logs.Logger
 }
 
-func NewScrapeProxiesUseCase(f Fetcher, sources []Source) *ScrapeProxiesUseCase {
+func NewScrapeProxiesUseCase(f Fetcher, sources []Source, logger logs.Logger) *ScrapeProxiesUseCase {
 	return &ScrapeProxiesUseCase{
 		fetcher: f,
 		sources: sources,
+		logger:  logger,
 	}
 }
 
-func (uc *ScrapeProxiesUseCase) Execute(ctx context.Context) ([]*ScrapedProxy, error) {
+func (uc *ScrapeProxiesUseCase) Execute(ctx context.Context) ([]*ScrapeOutput, []error) {
+	uc.logger.Info("starting proxy scrape", "sources", len(uc.sources))
+
 	var wg sync.WaitGroup
-	results := make(chan []*ScrapedProxy, len(uc.sources))
+	results := make(chan []*ScrapeOutput, len(uc.sources))
+	errors := make(chan error, len(uc.sources))
 
 	for _, src := range uc.sources {
 		wg.Add(1)
@@ -37,9 +44,11 @@ func (uc *ScrapeProxiesUseCase) Execute(ctx context.Context) ([]*ScrapedProxy, e
 
 			proxies, err := uc.fetcher.FetchAndParse(timeoutCtx, source)
 			if err != nil {
-				// to-do observability maybe, idk
+				uc.logger.Warn("source fetch failed", "source", source.Name, "error", err)
+				errors <- fmt.Errorf("source %s: %w", source.Name, err)
 				return
 			}
+			uc.logger.Debug("source fetched", "source", source.Name, "count", len(proxies))
 			results <- proxies
 		}(src)
 	}
@@ -47,20 +56,37 @@ func (uc *ScrapeProxiesUseCase) Execute(ctx context.Context) ([]*ScrapedProxy, e
 	go func() {
 		wg.Wait()
 		close(results)
+		close(errors)
 	}()
 
-	uniqueProxies := make(map[string]*ScrapedProxy)
+	uniqueProxies := make(map[string]*ScrapeOutput)
 
-	for batch := range results {
-		for _, p := range batch {
-			uniqueProxies[fmt.Sprintf("%s:%d", p.IP, p.Port)] = p
+	var errs []error
+	for results != nil || errors != nil {
+		select {
+		case batch, ok := <-results:
+			if !ok {
+				results = nil
+				continue
+			}
+			for _, p := range batch {
+				key := fmt.Sprintf("%s:%d", p.IP(), p.Port())
+				uniqueProxies[key] = p
+			}
+		case err, ok := <-errors:
+			if !ok {
+				errors = nil
+				continue
+			}
+			errs = append(errs, err)
 		}
 	}
 
-	finalList := make([]*ScrapedProxy, 0, len(uniqueProxies))
+	finalList := make([]*ScrapeOutput, 0, len(uniqueProxies))
 	for _, p := range uniqueProxies {
 		finalList = append(finalList, p)
 	}
 
-	return finalList, nil
+	uc.logger.Info("scrape completed", "unique", len(uniqueProxies), "errors", len(errs))
+	return finalList, errs
 }

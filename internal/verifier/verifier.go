@@ -18,7 +18,7 @@ type Verifiable interface {
 	URL() *url.URL
 }
 
-type Result struct {
+type VerifyOutput struct {
 	Success   bool
 	Latency   time.Duration
 	Anonymity AnonymityLevel
