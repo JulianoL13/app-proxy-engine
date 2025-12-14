@@ -23,23 +23,23 @@ func (_m *Fetcher) EXPECT() *Fetcher_Expecter {
 }
 
 // FetchAndParse provides a mock function with given fields: ctx, source
-func (_m *Fetcher) FetchAndParse(ctx context.Context, source scraper.Source) ([]*scraper.ScrapedProxy, error) {
+func (_m *Fetcher) FetchAndParse(ctx context.Context, source scraper.Source) ([]*scraper.ScrapeOutput, error) {
 	ret := _m.Called(ctx, source)
 
 	if len(ret) == 0 {
 		panic("no return value specified for FetchAndParse")
 	}
 
-	var r0 []*scraper.ScrapedProxy
+	var r0 []*scraper.ScrapeOutput
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, scraper.Source) ([]*scraper.ScrapedProxy, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, scraper.Source) ([]*scraper.ScrapeOutput, error)); ok {
 		return rf(ctx, source)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, scraper.Source) []*scraper.ScrapedProxy); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, scraper.Source) []*scraper.ScrapeOutput); ok {
 		r0 = rf(ctx, source)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*scraper.ScrapedProxy)
+			r0 = ret.Get(0).([]*scraper.ScrapeOutput)
 		}
 	}
 
@@ -71,12 +71,12 @@ func (_c *Fetcher_FetchAndParse_Call) Run(run func(ctx context.Context, source s
 	return _c
 }
 
-func (_c *Fetcher_FetchAndParse_Call) Return(_a0 []*scraper.ScrapedProxy, _a1 error) *Fetcher_FetchAndParse_Call {
+func (_c *Fetcher_FetchAndParse_Call) Return(_a0 []*scraper.ScrapeOutput, _a1 error) *Fetcher_FetchAndParse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *Fetcher_FetchAndParse_Call) RunAndReturn(run func(context.Context, scraper.Source) ([]*scraper.ScrapedProxy, error)) *Fetcher_FetchAndParse_Call {
+func (_c *Fetcher_FetchAndParse_Call) RunAndReturn(run func(context.Context, scraper.Source) ([]*scraper.ScrapeOutput, error)) *Fetcher_FetchAndParse_Call {
 	_c.Call.Return(run)
 	return _c
 }

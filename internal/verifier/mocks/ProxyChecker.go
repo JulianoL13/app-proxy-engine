@@ -23,18 +23,18 @@ func (_m *ProxyChecker) EXPECT() *ProxyChecker_Expecter {
 }
 
 // Verify provides a mock function with given fields: ctx, p
-func (_m *ProxyChecker) Verify(ctx context.Context, p verifier.Verifiable) verifier.Result {
+func (_m *ProxyChecker) Verify(ctx context.Context, p verifier.Verifiable) verifier.VerifyOutput {
 	ret := _m.Called(ctx, p)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Verify")
 	}
 
-	var r0 verifier.Result
-	if rf, ok := ret.Get(0).(func(context.Context, verifier.Verifiable) verifier.Result); ok {
+	var r0 verifier.VerifyOutput
+	if rf, ok := ret.Get(0).(func(context.Context, verifier.Verifiable) verifier.VerifyOutput); ok {
 		r0 = rf(ctx, p)
 	} else {
-		r0 = ret.Get(0).(verifier.Result)
+		r0 = ret.Get(0).(verifier.VerifyOutput)
 	}
 
 	return r0
@@ -59,12 +59,12 @@ func (_c *ProxyChecker_Verify_Call) Run(run func(ctx context.Context, p verifier
 	return _c
 }
 
-func (_c *ProxyChecker_Verify_Call) Return(_a0 verifier.Result) *ProxyChecker_Verify_Call {
+func (_c *ProxyChecker_Verify_Call) Return(_a0 verifier.VerifyOutput) *ProxyChecker_Verify_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *ProxyChecker_Verify_Call) RunAndReturn(run func(context.Context, verifier.Verifiable) verifier.Result) *ProxyChecker_Verify_Call {
+func (_c *ProxyChecker_Verify_Call) RunAndReturn(run func(context.Context, verifier.Verifiable) verifier.VerifyOutput) *ProxyChecker_Verify_Call {
 	_c.Call.Return(run)
 	return _c
 }
