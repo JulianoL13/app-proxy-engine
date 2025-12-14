@@ -53,6 +53,7 @@ func (c *Checker) Verify(ctx context.Context, p verifier.Verifiable) verifier.Ve
 	latency := time.Since(start)
 
 	if err != nil {
+		c.logger.Debug("proxy verification failed", "address", p.Address(), "error", err)
 		return verifier.VerifyOutput{
 			Success: false,
 			Latency: latency,
