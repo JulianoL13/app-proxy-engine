@@ -21,6 +21,11 @@ type ProxyChecker interface {
 	Check(ctx context.Context, proxies []*Proxy) <-chan CheckStreamResult
 }
 
+// Writer persists verified proxies
+type Writer interface {
+	Save(ctx context.Context, p *Proxy) error
+}
+
 type CheckOutput struct {
 	Success   bool
 	Latency   int64
@@ -36,13 +41,15 @@ type CheckStreamResult struct {
 type CollectProxiesUseCase struct {
 	source  ProxySource
 	checker ProxyChecker
+	writer  Writer
 	logger  logs.Logger
 }
 
-func NewCollectProxiesUseCase(source ProxySource, checker ProxyChecker, logger logs.Logger) *CollectProxiesUseCase {
+func NewCollectProxiesUseCase(source ProxySource, checker ProxyChecker, writer Writer, logger logs.Logger) *CollectProxiesUseCase {
 	return &CollectProxiesUseCase{
 		source:  source,
 		checker: checker,
+		writer:  writer,
 		logger:  logger,
 	}
 }
@@ -86,6 +93,13 @@ func (uc *CollectProxiesUseCase) Execute(ctx context.Context) (<-chan *Proxy, er
 			if r.Output.Success {
 				p.MarkSuccess(0, r.Output.Anonymity)
 				alive++
+
+				if uc.writer != nil {
+					if err := uc.writer.Save(ctx, p); err != nil {
+						uc.logger.Warn("failed to save proxy", "address", p.Address(), "error", err)
+					}
+				}
+
 				results <- p
 			} else {
 				p.MarkFailure()

@@ -48,7 +48,7 @@ func TestCollectProxiesUseCase_Execute(t *testing.T) {
 
 		mockChecker.On("Check", mock.Anything, mock.Anything).Return((<-chan proxy.CheckStreamResult)(resultChan))
 
-		uc := proxy.NewCollectProxiesUseCase(mockSource, mockChecker, logmocks.LoggerMock{})
+		uc := proxy.NewCollectProxiesUseCase(mockSource, mockChecker, nil, logmocks.LoggerMock{})
 		stream, err := uc.Execute(ctx)
 
 		assert.NoError(t, err)
@@ -68,7 +68,7 @@ func TestCollectProxiesUseCase_Execute(t *testing.T) {
 
 		mockSource.On("Fetch", mock.Anything).Return([]proxy.ProxyDataInput{}, []error{})
 
-		uc := proxy.NewCollectProxiesUseCase(mockSource, mockChecker, logmocks.LoggerMock{})
+		uc := proxy.NewCollectProxiesUseCase(mockSource, mockChecker, nil, logmocks.LoggerMock{})
 		stream, err := uc.Execute(ctx)
 
 		assert.NoError(t, err)
