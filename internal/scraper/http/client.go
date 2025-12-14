@@ -36,19 +36,19 @@ func New(logger logs.Logger) *Fetcher {
 func (f *Fetcher) FetchAndParse(ctx context.Context, source scraper.Source) ([]*scraper.ScrapeOutput, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", source.URL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("bad request: %w", err)
+		return nil, fmt.Errorf("source %s: create request: %w", source.Name, err)
 	}
 
 	req.Header.Set("User-Agent", "ProxyEngine/1.0")
 
 	resp, err := f.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("fetch failed: %w", err)
+		return nil, fmt.Errorf("source %s: fetch: %w", source.Name, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("bad status: %d", resp.StatusCode)
+		return nil, fmt.Errorf("source %s: status %d: %w", source.Name, resp.StatusCode, scraper.ErrSourceUnavailable)
 	}
 
 	var proxies []*scraper.ScrapeOutput
@@ -72,7 +72,7 @@ func (f *Fetcher) FetchAndParse(ctx context.Context, source scraper.Source) ([]*
 	}
 
 	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("scan error: %w", err)
+		return nil, fmt.Errorf("source %s: scan: %w", source.Name, err)
 	}
 
 	return proxies, nil

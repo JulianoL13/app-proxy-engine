@@ -45,7 +45,7 @@ func (uc *ScrapeProxiesUseCase) Execute(ctx context.Context) ([]*ScrapeOutput, [
 			proxies, err := uc.fetcher.FetchAndParse(timeoutCtx, source)
 			if err != nil {
 				uc.logger.Warn("source fetch failed", "source", source.Name, "error", err)
-				errors <- fmt.Errorf("source %s: %w", source.Name, err)
+				errors <- err
 				return
 			}
 			uc.logger.Debug("source fetched", "source", source.Name, "count", len(proxies))

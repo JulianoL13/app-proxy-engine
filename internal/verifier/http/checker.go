@@ -30,7 +30,6 @@ func NewChecker(target string, timeout time.Duration, logger logs.Logger) *Check
 	return c
 }
 
-// fetchRealIP gets the real IP without proxy for comparison
 func (c *Checker) fetchRealIP() string {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -78,7 +77,6 @@ func (c *Checker) Verify(ctx context.Context, p verifier.Verifiable) verifier.Ve
 	reqCtx, cancel := context.WithTimeout(ctx, c.Timeout)
 	defer cancel()
 
-	// Use /headers endpoint to detect proxy headers
 	req, err := http.NewRequestWithContext(reqCtx, "GET", "https://httpbin.org/headers", nil)
 	if err != nil {
 		return verifier.VerifyOutput{Error: err}
@@ -91,10 +89,17 @@ func (c *Checker) Verify(ctx context.Context, p verifier.Verifiable) verifier.Ve
 
 	if err != nil {
 		c.logger.Debug("proxy verification failed", "address", p.Address(), "error", err)
+
+		// Wrap with context and appropriate sentinel
+		wrappedErr := fmt.Errorf("proxy %s: %w", p.Address(), err)
+		if ctx.Err() == context.DeadlineExceeded || reqCtx.Err() == context.DeadlineExceeded {
+			wrappedErr = fmt.Errorf("proxy %s: %w", p.Address(), verifier.ErrProxyTimeout)
+		}
+
 		return verifier.VerifyOutput{
 			Success: false,
 			Latency: latency,
-			Error:   err,
+			Error:   wrappedErr,
 		}
 	}
 	defer resp.Body.Close()
@@ -103,7 +108,7 @@ func (c *Checker) Verify(ctx context.Context, p verifier.Verifiable) verifier.Ve
 		return verifier.VerifyOutput{
 			Success: false,
 			Latency: latency,
-			Error:   fmt.Errorf("bad status code: %d", resp.StatusCode),
+			Error:   fmt.Errorf("proxy %s: status %d: %w", p.Address(), resp.StatusCode, verifier.ErrProxyDead),
 		}
 	}
 
@@ -125,19 +130,16 @@ func (c *Checker) Verify(ctx context.Context, p verifier.Verifiable) verifier.Ve
 	}
 }
 
-// headersResponse represents httpbin.org/headers response
 type headersResponse struct {
 	Headers map[string]string `json:"headers"`
 }
 
-// detectAnonymity analyzes headers to determine proxy anonymity level
 func (c *Checker) detectAnonymity(body []byte) string {
 	var resp headersResponse
 	if err := json.Unmarshal(body, &resp); err != nil {
 		return "unknown"
 	}
 
-	// Check for real IP leak in common proxy headers
 	proxyHeaders := []string{
 		"X-Forwarded-For",
 		"X-Real-Ip",
@@ -158,17 +160,12 @@ func (c *Checker) detectAnonymity(body []byte) string {
 
 		hasProxyHeader = true
 
-		// Check if our real IP is leaked
 		if c.realIP != "" && strings.Contains(value, c.realIP) {
 			hasIPLeak = true
 			break
 		}
 	}
 
-	// Classification logic:
-	// - transparent: IP is leaked
-	// - anonymous: proxy headers exist but no IP leak
-	// - elite: no proxy headers at all
 	if hasIPLeak {
 		return "transparent"
 	}
