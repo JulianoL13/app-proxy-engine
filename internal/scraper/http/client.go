@@ -35,11 +35,11 @@ func New(logger logs.Logger) *Fetcher {
 
 func (f *Fetcher) FetchAndParse(ctx context.Context, source scraper.Source) ([]*scraper.ScrapeOutput, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", source.URL, nil)
-	req.Header.Set("User-Agent", "ProxyEngine/1.0")
-
 	if err != nil {
 		return nil, fmt.Errorf("bad request: %w", err)
 	}
+
+	req.Header.Set("User-Agent", "ProxyEngine/1.0")
 
 	resp, err := f.client.Do(req)
 	if err != nil {
