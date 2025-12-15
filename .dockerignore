@@ -1,0 +1,28 @@
+# Version Control
+.git
+.gitignore
+
+# Environment Variables
+.env
+.env.*
+
+# Temporary Files
+tmp/
+bin/
+*.log
+*.tmp
+.DS_Store
+
+# IDEs
+.idea/
+.vscode/
+
+# Documentation & Configs not needed in build
+docker-compose.yml
+docker-compose.dev.yml
+README.md
+task.md
+code_comparison.md
+implementation_plan.md
+walkthrough.md
+*.md
