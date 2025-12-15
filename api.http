@@ -3,32 +3,42 @@
 
 @baseUrl = http://localhost:8080
 
+### ==========================================
 ### Health Check
+### ==========================================
+
 GET {{baseUrl}}/health
 
+### ==========================================
+### Proxy API
+### ==========================================
+
 ### List All Proxies
-GET {{baseUrl}}/proxies
+GET {{baseUrl}}/api/v1/proxies
+
+### Pagination with cursor
+GET {{baseUrl}}/api/v1/proxies?limit=10
 
 ### List HTTP Proxies Only
-GET {{baseUrl}}/proxies?protocol=http
+GET {{baseUrl}}/api/v1/proxies?protocol=http
 
 ### List SOCKS5 Proxies Only
-GET {{baseUrl}}/proxies?protocol=socks5
+GET {{baseUrl}}/api/v1/proxies?protocol=socks5
 
 ### List Elite Anonymity Proxies
-GET {{baseUrl}}/proxies?anonymity=elite
+GET {{baseUrl}}/api/v1/proxies?anonymity=elite
 
 ### List Fast Proxies (max 150ms latency)
-GET {{baseUrl}}/proxies?max_latency_ms=150
+GET {{baseUrl}}/api/v1/proxies?max_latency_ms=150
 
 ### Combined Filters
-GET {{baseUrl}}/proxies?protocol=http&anonymity=elite&max_latency_ms=200
+GET {{baseUrl}}/api/v1/proxies?protocol=http&anonymity=elite&max_latency_ms=200
 
 ### Get Random Proxy
-GET {{baseUrl}}/proxies/random
+GET {{baseUrl}}/api/v1/proxies/random
 
 ### Get Random HTTP Proxy
-GET {{baseUrl}}/proxies/random?protocol=http
+GET {{baseUrl}}/api/v1/proxies/random?protocol=http
 
 ### Get Random Elite Proxy
-GET {{baseUrl}}/proxies/random?anonymity=elite
+GET {{baseUrl}}/api/v1/proxies/random?anonymity=elite

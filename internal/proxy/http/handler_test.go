@@ -50,7 +50,7 @@ func (m *mockGetProxiesUseCase) Execute(ctx context.Context, input proxyhttp.Get
 	return proxyhttp.GetProxiesOutput{
 		Proxies:    filtered,
 		NextCursor: m.nextCursor,
-		Total:      m.total, // In this mock we don't update Total, but it's enough for tests
+		Total:      m.total,
 	}, nil
 }
 
@@ -95,7 +95,7 @@ func TestHandler_GetProxies(t *testing.T) {
 		handler := proxyhttp.NewHandler(getProxiesUC, &mockGetRandomProxyUseCase{}, logger)
 		router := proxyhttp.NewRouter(handler, logger)
 
-		req := httptest.NewRequest(http.MethodGet, "/proxies", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/proxies", nil)
 		rec := httptest.NewRecorder()
 
 		router.ServeHTTP(rec, req)
@@ -120,7 +120,7 @@ func TestHandler_GetProxies(t *testing.T) {
 		handler := proxyhttp.NewHandler(getProxiesUC, &mockGetRandomProxyUseCase{}, logger)
 		router := proxyhttp.NewRouter(handler, logger)
 
-		req := httptest.NewRequest(http.MethodGet, "/proxies?protocol=http", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/proxies?protocol=http", nil)
 		rec := httptest.NewRecorder()
 
 		router.ServeHTTP(rec, req)
@@ -141,7 +141,7 @@ func TestHandler_GetProxies(t *testing.T) {
 		handler := proxyhttp.NewHandler(getProxiesUC, &mockGetRandomProxyUseCase{}, logger)
 		router := proxyhttp.NewRouter(handler, logger)
 
-		req := httptest.NewRequest(http.MethodGet, "/proxies?anonymity=elite", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/proxies?anonymity=elite", nil)
 		rec := httptest.NewRecorder()
 
 		router.ServeHTTP(rec, req)
@@ -162,7 +162,7 @@ func TestHandler_GetProxies(t *testing.T) {
 		handler := proxyhttp.NewHandler(getProxiesUC, &mockGetRandomProxyUseCase{}, logger)
 		router := proxyhttp.NewRouter(handler, logger)
 
-		req := httptest.NewRequest(http.MethodGet, "/proxies?max_latency_ms=150", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/proxies?max_latency_ms=150", nil)
 		rec := httptest.NewRecorder()
 
 		router.ServeHTTP(rec, req)
@@ -187,7 +187,7 @@ func TestHandler_GetRandomProxy(t *testing.T) {
 		handler := proxyhttp.NewHandler(&mockGetProxiesUseCase{}, getRandomUC, logger)
 		router := proxyhttp.NewRouter(handler, logger)
 
-		req := httptest.NewRequest(http.MethodGet, "/proxies/random", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/proxies/random", nil)
 		rec := httptest.NewRecorder()
 
 		router.ServeHTTP(rec, req)
@@ -207,7 +207,7 @@ func TestHandler_GetRandomProxy(t *testing.T) {
 		handler := proxyhttp.NewHandler(&mockGetProxiesUseCase{}, getRandomUC, logger)
 		router := proxyhttp.NewRouter(handler, logger)
 
-		req := httptest.NewRequest(http.MethodGet, "/proxies/random", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/proxies/random", nil)
 		rec := httptest.NewRecorder()
 
 		router.ServeHTTP(rec, req)
