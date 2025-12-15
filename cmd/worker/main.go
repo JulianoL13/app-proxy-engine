@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/JulianoL13/app-proxy-engine/internal/common/events"
 	"github.com/JulianoL13/app-proxy-engine/internal/common/logs/slog"
 	queueredis "github.com/JulianoL13/app-proxy-engine/internal/common/queue/redis"
 	"github.com/JulianoL13/app-proxy-engine/internal/proxy"
@@ -49,11 +50,12 @@ func (a *consumerAdapter) Ack(ctx context.Context, topic, group, msgID string) e
 type proxyDeserializer struct{}
 
 func (d proxyDeserializer) Deserialize(payload []byte) (verifier.VerifiedProxy, error) {
-	var p proxy.Proxy
-	if err := json.Unmarshal(payload, &p); err != nil {
+	var event events.ProxyDiscoveredEvent
+	if err := json.Unmarshal(payload, &event); err != nil {
 		return nil, err
 	}
-	return &proxyAdapter{inner: &p}, nil
+	p := proxy.NewProxy(event.IP, event.Port, proxy.Protocol(event.Protocol), event.Source)
+	return &proxyAdapter{inner: p}, nil
 }
 
 type proxyAdapter struct {
@@ -86,6 +88,7 @@ func main() {
 	consumerName := getEnv("CONSUMER_NAME", mustHostname())
 	redisTopic := getEnv("REDIS_TOPIC_VERIFY", "proxies:verify")
 	redisGroup := getEnv("REDIS_GROUP_WORKERS", "verifiers")
+	redisKeyPrefix := getEnv("REDIS_KEY_PREFIX", "v1")
 
 	logger := slog.NewJSON(logslog.LevelInfo)
 
@@ -107,7 +110,7 @@ func main() {
 	consumer := &consumerAdapter{inner: queueredis.NewStreamsClient(redisClient)}
 	checker := httpverifier.NewChecker("", verifyTimeout, logger)
 	deserializer := proxyDeserializer{}
-	writer := &writerAdapter{inner: proxyredis.NewRepository(redisClient).WithTTL(proxyTTL)}
+	writer := &writerAdapter{inner: proxyredis.NewRepository(redisClient, redisKeyPrefix).WithTTL(proxyTTL)}
 
 	uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, consumerName, redisTopic, redisGroup)
 

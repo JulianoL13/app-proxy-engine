@@ -32,7 +32,7 @@ func TestRepository_Save(t *testing.T) {
 	})
 	defer client.Close()
 
-	repo := proxyredis.NewRepository(client).WithTTL(5 * time.Minute)
+	repo := proxyredis.NewRepository(client, "test-prefix").WithTTL(5 * time.Minute)
 
 	t.Run("saves proxy to redis", func(t *testing.T) {
 		p := proxy.NewProxy("192.168.1.1", 8080, proxy.HTTP, "test-source")
@@ -41,14 +41,14 @@ func TestRepository_Save(t *testing.T) {
 		err := repo.Save(ctx, p)
 		assert.NoError(t, err)
 
-		exists, err := client.Exists(ctx, "proxy:192.168.1.1:8080").Result()
+		exists, err := client.Exists(ctx, "test-prefix:data:192.168.1.1:8080").Result()
 		assert.NoError(t, err)
 		assert.Equal(t, int64(1), exists)
 
-		_, err = client.ZScore(ctx, "proxies:alive", "192.168.1.1:8080").Result()
+		_, err = client.ZScore(ctx, "test-prefix:alive", "192.168.1.1:8080").Result()
 		assert.NoError(t, err)
 
-		_, err = client.ZScore(ctx, "proxies:protocol:http", "192.168.1.1:8080").Result()
+		_, err = client.ZScore(ctx, "test-prefix:protocol:http", "192.168.1.1:8080").Result()
 		assert.NoError(t, err)
 	})
 
@@ -59,10 +59,10 @@ func TestRepository_Save(t *testing.T) {
 		err := repo.Save(ctx, p)
 		assert.NoError(t, err)
 
-		_, err = client.ZScore(ctx, "proxies:protocol:socks5", "10.0.0.1:1080").Result()
+		_, err = client.ZScore(ctx, "test-prefix:protocol:socks5", "10.0.0.1:1080").Result()
 		assert.NoError(t, err)
 
-		_, err = client.ZScore(ctx, "proxies:protocol:http", "10.0.0.1:1080").Result()
+		_, err = client.ZScore(ctx, "test-prefix:protocol:http", "10.0.0.1:1080").Result()
 		assert.Error(t, err)
 	})
 
@@ -76,7 +76,7 @@ func TestRepository_Save(t *testing.T) {
 		err = repo.Save(ctx, p2)
 		assert.NoError(t, err)
 
-		_, err = client.ZScore(ctx, "proxies:alive", "192.168.2.2:3128").Result()
+		_, err = client.ZScore(ctx, "test-prefix:alive", "192.168.2.2:3128").Result()
 		assert.NoError(t, err)
 	})
 }
@@ -94,7 +94,7 @@ func TestRepository_Save_ConnectionError(t *testing.T) {
 	})
 	defer client.Close()
 
-	repo := proxyredis.NewRepository(client)
+	repo := proxyredis.NewRepository(client, "test-prefix")
 
 	p := proxy.NewProxy("1.1.1.1", 8080, proxy.HTTP, "test")
 	err := repo.Save(ctx, p)

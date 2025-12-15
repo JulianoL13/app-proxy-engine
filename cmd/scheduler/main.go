@@ -10,9 +10,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/JulianoL13/app-proxy-engine/internal/common/events"
 	"github.com/JulianoL13/app-proxy-engine/internal/common/logs/slog"
 	queueredis "github.com/JulianoL13/app-proxy-engine/internal/common/queue/redis"
-	"github.com/JulianoL13/app-proxy-engine/internal/proxy"
 	"github.com/JulianoL13/app-proxy-engine/internal/scraper"
 	httpclient "github.com/JulianoL13/app-proxy-engine/internal/scraper/http"
 	"github.com/joho/godotenv"
@@ -35,8 +35,13 @@ func (a *scraperAdapter) Execute(ctx context.Context) ([]scraper.ScrapedProxy, [
 type proxySerializer struct{}
 
 func (s proxySerializer) Serialize(p scraper.ScrapedProxy) ([]byte, error) {
-	proxyObj := proxy.NewProxy(p.IP(), p.Port(), proxy.Protocol(p.Protocol()), p.Source())
-	return json.Marshal(proxyObj)
+	event := events.ProxyDiscoveredEvent{
+		IP:       p.IP(),
+		Port:     p.Port(),
+		Protocol: p.Protocol(),
+		Source:   p.Source(),
+	}
+	return json.Marshal(event)
 }
 
 func main() {

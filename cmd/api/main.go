@@ -62,6 +62,7 @@ type Config struct {
 	RedisPass string
 	RedisDB   int
 	ProxyTTL  time.Duration
+	KeyPrefix string
 }
 
 func loadConfig() Config {
@@ -73,6 +74,7 @@ func loadConfig() Config {
 		RedisPass: getEnv("REDIS_PASSWORD", ""),
 		RedisDB:   getEnvInt("REDIS_DB", 0),
 		ProxyTTL:  time.Duration(getEnvInt("PROXY_TTL_MINUTES", 30)) * time.Minute,
+		KeyPrefix: getEnv("REDIS_KEY_PREFIX", "v1"),
 	}
 }
 
@@ -115,7 +117,7 @@ func main() {
 	}
 	innerLogger.Info("connected to redis", "addr", cfg.RedisAddr)
 
-	repo := proxyredis.NewRepository(redisClient).WithTTL(cfg.ProxyTTL)
+	repo := proxyredis.NewRepository(redisClient, cfg.KeyPrefix).WithTTL(cfg.ProxyTTL)
 
 	getProxiesUC := proxy.NewGetProxiesUseCase(repo, innerLogger)
 	getRandomUC := proxy.NewGetRandomProxyUseCase(repo, innerLogger)
