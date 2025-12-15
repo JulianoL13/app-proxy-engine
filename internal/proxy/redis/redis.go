@@ -48,6 +48,10 @@ func (r *Repository) protocolSetKey(protocol string) string {
 	return fmt.Sprintf("%s:protocol:%s", r.keyPrefix, protocol)
 }
 
+func (r *Repository) anonymitySetKey(anonymity string) string {
+	return fmt.Sprintf("%s:anonymity:%s", r.keyPrefix, anonymity)
+}
+
 func (r *Repository) Save(ctx context.Context, p *proxy.Proxy) error {
 	key := r.proxyKey(p.Address())
 
@@ -63,6 +67,7 @@ func (r *Repository) Save(ctx context.Context, p *proxy.Proxy) error {
 	pipe.Set(ctx, key, data, r.ttl)
 	pipe.ZAdd(ctx, r.aliveSetKey(), redis.Z{Score: score, Member: p.Address()})
 	pipe.ZAdd(ctx, r.protocolSetKey(string(p.Protocol)), redis.Z{Score: score, Member: p.Address()})
+	pipe.ZAdd(ctx, r.anonymitySetKey(string(p.Anonymity)), redis.Z{Score: score, Member: p.Address()})
 
 	_, err = pipe.Exec(ctx)
 	if err != nil {
@@ -72,9 +77,20 @@ func (r *Repository) Save(ctx context.Context, p *proxy.Proxy) error {
 	return nil
 }
 
-func (r *Repository) GetAlive(ctx context.Context, cursor float64, limit int) ([]*proxy.Proxy, float64, int, error) {
-	aliveKey := r.aliveSetKey()
-	total, err := r.client.ZCard(ctx, aliveKey).Result()
+func (r *Repository) GetAlive(ctx context.Context, cursor float64, limit int, filter proxy.FilterOptions) ([]*proxy.Proxy, float64, int, error) {
+	targetKey := r.aliveSetKey()
+
+	if filter.Protocol != "" && filter.Anonymity == "" {
+		targetKey = r.protocolSetKey(filter.Protocol)
+	} else if filter.Anonymity != "" && filter.Protocol == "" {
+		targetKey = r.anonymitySetKey(filter.Anonymity)
+	}
+
+	if filter.Protocol != "" && filter.Anonymity != "" {
+		targetKey = r.protocolSetKey(filter.Protocol)
+	}
+
+	total, err := r.client.ZCard(ctx, targetKey).Result()
 	if err != nil {
 		return nil, 0, 0, fmt.Errorf("zcard: %w", err)
 	}
@@ -90,13 +106,13 @@ func (r *Repository) GetAlive(ctx context.Context, cursor float64, limit int) ([
 			min = fmt.Sprintf("(%f", cursor)
 		}
 
-		addresses, err = r.client.ZRangeByScore(ctx, aliveKey, &redis.ZRangeBy{
+		addresses, err = r.client.ZRangeByScore(ctx, targetKey, &redis.ZRangeBy{
 			Min:   min,
 			Max:   "+inf",
 			Count: int64(limit),
 		}).Result()
 	} else {
-		addresses, err = r.client.ZRange(ctx, aliveKey, 0, -1).Result()
+		addresses, err = r.client.ZRange(ctx, targetKey, 0, -1).Result()
 	}
 
 	if err != nil {
@@ -133,13 +149,20 @@ func (r *Repository) GetAlive(ctx context.Context, cursor float64, limit int) ([
 			continue
 		}
 
+		if filter.Anonymity != "" && string(p.Anonymity) != filter.Anonymity {
+			continue
+		}
+		if filter.Protocol != "" && string(p.Protocol) != filter.Protocol {
+			continue
+		}
+
 		proxies = append(proxies, &p)
 	}
 
 	var nextCursor float64
 	if limit > 0 && len(addresses) == limit {
 		lastAddr := addresses[len(addresses)-1]
-		score, err := r.client.ZScore(ctx, aliveKey, lastAddr).Result()
+		score, err := r.client.ZScore(ctx, targetKey, lastAddr).Result()
 		if err == nil {
 			nextCursor = score
 		}

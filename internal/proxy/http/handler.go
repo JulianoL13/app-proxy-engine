@@ -19,8 +19,10 @@ type Logger interface {
 }
 
 type GetProxiesInput struct {
-	Cursor float64
-	Limit  int
+	Cursor    float64
+	Limit     int
+	Protocol  string
+	Anonymity string
 }
 
 type GetProxiesOutput struct {
@@ -144,16 +146,6 @@ func (f ProxyFilter) matches(p *proxy.Proxy) bool {
 	return true
 }
 
-func filterProxies(proxies []*proxy.Proxy, f ProxyFilter) []*proxy.Proxy {
-	result := make([]*proxy.Proxy, 0, len(proxies))
-	for _, p := range proxies {
-		if f.matches(p) {
-			result = append(result, p)
-		}
-	}
-	return result
-}
-
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
@@ -163,16 +155,32 @@ func (h *Handler) GetProxies(w http.ResponseWriter, r *http.Request) {
 	logger := h.getLogger(r)
 
 	cursor, limit := parsePagination(r)
+	filters := parseFilters(r)
 
-	output, err := h.getProxies.Execute(r.Context(), GetProxiesInput{Cursor: cursor, Limit: limit})
+	output, err := h.getProxies.Execute(r.Context(), GetProxiesInput{
+		Cursor:    cursor,
+		Limit:     limit,
+		Protocol:  filters.Protocol,
+		Anonymity: filters.Anonymity,
+	})
 	if err != nil {
 		logger.Error("failed to get proxies", "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
-	filters := parseFilters(r)
-	proxies := filterProxies(output.Proxies, filters)
+	// Filter by Latency (in memory still, as Redis doesn't index latency yet)
+	// Protocol and Anonymity are handled by UseCase -> Repository
+	proxies := output.Proxies
+	if filters.MaxLatency > 0 {
+		filtered := make([]*proxy.Proxy, 0, len(proxies))
+		for _, p := range proxies {
+			if p.Latency <= filters.MaxLatency {
+				filtered = append(filtered, p)
+			}
+		}
+		proxies = filtered
+	}
 
 	data := make([]ProxyResponse, len(proxies))
 	for i, p := range proxies {

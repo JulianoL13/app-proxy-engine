@@ -8,13 +8,20 @@ type GetProxiesLogger interface {
 	Info(msg string, args ...any)
 }
 
+type FilterOptions struct {
+	Protocol  string
+	Anonymity string
+}
+
 type Reader interface {
-	GetAlive(ctx context.Context, cursor float64, limit int) ([]*Proxy, float64, int, error)
+	GetAlive(ctx context.Context, cursor float64, limit int, filter FilterOptions) ([]*Proxy, float64, int, error)
 }
 
 type GetProxiesInput struct {
-	Cursor float64
-	Limit  int
+	Cursor    float64
+	Limit     int
+	Protocol  string
+	Anonymity string
 }
 
 type GetProxiesOutput struct {
@@ -36,7 +43,12 @@ func NewGetProxiesUseCase(reader Reader, logger GetProxiesLogger) *GetProxiesUse
 }
 
 func (uc *GetProxiesUseCase) Execute(ctx context.Context, input GetProxiesInput) (GetProxiesOutput, error) {
-	proxies, nextCursor, total, err := uc.reader.GetAlive(ctx, input.Cursor, input.Limit)
+	filters := FilterOptions{
+		Protocol:  input.Protocol,
+		Anonymity: input.Anonymity,
+	}
+
+	proxies, nextCursor, total, err := uc.reader.GetAlive(ctx, input.Cursor, input.Limit, filters)
 	if err != nil {
 		return GetProxiesOutput{}, err
 	}

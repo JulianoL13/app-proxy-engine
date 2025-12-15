@@ -18,7 +18,7 @@ type getRandomMockReader struct {
 	err        error
 }
 
-func (m *getRandomMockReader) GetAlive(ctx context.Context, cursor float64, limit int) ([]*proxy.Proxy, float64, int, error) {
+func (m *getRandomMockReader) GetAlive(ctx context.Context, cursor float64, limit int, filter proxy.FilterOptions) ([]*proxy.Proxy, float64, int, error) {
 	return m.proxies, m.nextCursor, m.total, m.err
 }
 

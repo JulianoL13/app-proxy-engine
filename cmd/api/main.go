@@ -37,7 +37,12 @@ type getProxiesAdapter struct {
 }
 
 func (a *getProxiesAdapter) Execute(ctx context.Context, input proxyhttp.GetProxiesInput) (proxyhttp.GetProxiesOutput, error) {
-	out, err := a.uc.Execute(ctx, proxy.GetProxiesInput{Cursor: input.Cursor, Limit: input.Limit})
+	out, err := a.uc.Execute(ctx, proxy.GetProxiesInput{
+		Cursor:    input.Cursor,
+		Limit:     input.Limit,
+		Protocol:  input.Protocol,
+		Anonymity: input.Anonymity,
+	})
 	if err != nil {
 		return proxyhttp.GetProxiesOutput{}, err
 	}

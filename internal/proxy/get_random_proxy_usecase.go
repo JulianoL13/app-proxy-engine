@@ -26,7 +26,7 @@ func NewGetRandomProxyUseCase(reader Reader, logger GetRandomProxyLogger) *GetRa
 }
 
 func (uc *GetRandomProxyUseCase) Execute(ctx context.Context) (*Proxy, error) {
-	proxies, _, _, err := uc.reader.GetAlive(ctx, 0, 0)
+	proxies, _, _, err := uc.reader.GetAlive(ctx, 0, 0, FilterOptions{})
 	if err != nil {
 		return nil, err
 	}

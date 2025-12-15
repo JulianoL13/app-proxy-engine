@@ -35,10 +35,22 @@ func (m *mockGetProxiesUseCase) Execute(ctx context.Context, input proxyhttp.Get
 	if m.err != nil {
 		return proxyhttp.GetProxiesOutput{}, m.err
 	}
+
+	filtered := make([]*proxy.Proxy, 0)
+	for _, p := range m.proxies {
+		if input.Protocol != "" && string(p.Protocol) != input.Protocol {
+			continue
+		}
+		if input.Anonymity != "" && string(p.Anonymity) != input.Anonymity {
+			continue
+		}
+		filtered = append(filtered, p)
+	}
+
 	return proxyhttp.GetProxiesOutput{
-		Proxies:    m.proxies,
+		Proxies:    filtered,
 		NextCursor: m.nextCursor,
-		Total:      m.total,
+		Total:      m.total, // In this mock we don't update Total, but it's enough for tests
 	}, nil
 }
 
