@@ -84,6 +84,8 @@ func main() {
 	verifyTimeout := time.Duration(getEnvInt("VERIFY_TIMEOUT_SECONDS", 10)) * time.Second
 	proxyTTL := time.Duration(getEnvInt("PROXY_TTL_MINUTES", 30)) * time.Minute
 	consumerName := getEnv("CONSUMER_NAME", mustHostname())
+	redisTopic := getEnv("REDIS_TOPIC_VERIFY", "proxies:verify")
+	redisGroup := getEnv("REDIS_GROUP_WORKERS", "verifiers")
 
 	logger := slog.NewJSON(logslog.LevelInfo)
 
@@ -107,7 +109,7 @@ func main() {
 	deserializer := proxyDeserializer{}
 	writer := &writerAdapter{inner: proxyredis.NewRepository(redisClient).WithTTL(proxyTTL)}
 
-	uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, consumerName)
+	uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, consumerName, redisTopic, redisGroup)
 
 	go func() {
 		quit := make(chan os.Signal, 1)

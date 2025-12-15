@@ -29,13 +29,14 @@ type ProxySerializer interface {
 	Serialize(p ScrapedProxy) ([]byte, error)
 }
 
-const TopicVerify = "proxies:verify"
+const DefaultTopicVerify = "proxies:verify"
 
 type ScheduleScrapingUseCase struct {
 	scraper    ProxyScraper
 	serializer ProxySerializer
 	publisher  Publisher
 	interval   time.Duration
+	topic      string
 	logger     SchedulerLogger
 }
 
@@ -45,18 +46,23 @@ func NewScheduleScrapingUseCase(
 	publisher Publisher,
 	interval time.Duration,
 	logger SchedulerLogger,
+	topic string,
 ) *ScheduleScrapingUseCase {
+	if topic == "" {
+		topic = DefaultTopicVerify
+	}
 	return &ScheduleScrapingUseCase{
 		scraper:    scraper,
 		serializer: serializer,
 		publisher:  publisher,
 		interval:   interval,
+		topic:      topic,
 		logger:     logger,
 	}
 }
 
 func (uc *ScheduleScrapingUseCase) Execute(ctx context.Context) error {
-	uc.logger.Info("starting scheduler", "interval", uc.interval)
+	uc.logger.Info("starting scheduler", "interval", uc.interval, "topic", uc.topic)
 
 	uc.runCycle(ctx)
 
@@ -90,7 +96,7 @@ func (uc *ScheduleScrapingUseCase) runCycle(ctx context.Context) {
 			continue
 		}
 
-		if err := uc.publisher.Publish(ctx, TopicVerify, data); err != nil {
+		if err := uc.publisher.Publish(ctx, uc.topic, data); err != nil {
 			uc.logger.Warn("failed to publish proxy", "error", err)
 			continue
 		}

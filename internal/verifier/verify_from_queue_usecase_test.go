@@ -97,7 +97,7 @@ func TestVerifyFromQueueUseCase_Execute(t *testing.T) {
 		deserializer := &mockDeserializer{proxy: proxy}
 		writer := &mockWriter{}
 
-		uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, "test-worker")
+		uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, "test-worker", "test-topic", "test-group")
 
 		err := uc.Execute(context.Background())
 
@@ -119,7 +119,7 @@ func TestVerifyFromQueueUseCase_Execute(t *testing.T) {
 		deserializer := &mockDeserializer{proxy: proxy}
 		writer := &mockWriter{}
 
-		uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, "test-worker")
+		uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, "test-worker", "test-topic", "test-group")
 
 		err := uc.Execute(context.Background())
 
@@ -138,7 +138,7 @@ func TestVerifyFromQueueUseCase_Execute(t *testing.T) {
 		deserializer := &mockDeserializer{err: errors.New("invalid json")}
 		writer := &mockWriter{}
 
-		uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, "test-worker")
+		uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, "test-worker", "test-topic", "test-group")
 
 		err := uc.Execute(context.Background())
 
@@ -153,7 +153,7 @@ func TestVerifyFromQueueUseCase_Execute(t *testing.T) {
 		deserializer := &mockDeserializer{}
 		writer := &mockWriter{}
 
-		uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, "test-worker")
+		uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, "test-worker", "test-topic", "test-group")
 
 		err := uc.Execute(context.Background())
 
@@ -173,7 +173,7 @@ func TestVerifyFromQueueUseCase_Execute(t *testing.T) {
 		deserializer := &mockDeserializer{proxy: proxy}
 		writer := &mockWriter{err: errors.New("save failed")}
 
-		uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, "test-worker")
+		uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, "test-worker", "test-topic", "test-group")
 
 		err := uc.Execute(context.Background())
 

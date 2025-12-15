@@ -52,8 +52,9 @@ type Writer interface {
 }
 
 const (
-	TopicVerify  = "proxies:verify"
-	GroupWorkers = "verifiers"
+	// Default values if not provided via config, though we encourage explicit config
+	DefaultTopicVerify  = "proxies:verify"
+	DefaultGroupWorkers = "verifiers"
 )
 
 type VerifyFromQueueUseCase struct {
@@ -63,6 +64,8 @@ type VerifyFromQueueUseCase struct {
 	writer       Writer
 	logger       Logger
 	id           string
+	topic        string
+	group        string
 }
 
 func NewVerifyFromQueueUseCase(
@@ -72,7 +75,15 @@ func NewVerifyFromQueueUseCase(
 	writer Writer,
 	logger Logger,
 	consumerID string,
+	topic string,
+	group string,
 ) *VerifyFromQueueUseCase {
+	if topic == "" {
+		topic = DefaultTopicVerify
+	}
+	if group == "" {
+		group = DefaultGroupWorkers
+	}
 	return &VerifyFromQueueUseCase{
 		consumer:     consumer,
 		checker:      checker,
@@ -80,13 +91,15 @@ func NewVerifyFromQueueUseCase(
 		writer:       writer,
 		logger:       logger,
 		id:           consumerID,
+		topic:        topic,
+		group:        group,
 	}
 }
 
 func (uc *VerifyFromQueueUseCase) Execute(ctx context.Context) error {
-	uc.logger.Info("starting verification", "consumer", uc.id)
+	uc.logger.Info("starting verification", "consumer", uc.id, "topic", uc.topic, "group", uc.group)
 
-	messages, err := uc.consumer.Subscribe(ctx, TopicVerify, GroupWorkers, uc.id)
+	messages, err := uc.consumer.Subscribe(ctx, uc.topic, uc.group, uc.id)
 	if err != nil {
 		return err
 	}
@@ -98,7 +111,7 @@ func (uc *VerifyFromQueueUseCase) Execute(ctx context.Context) error {
 		p, err := uc.deserializer.Deserialize(msg.Payload)
 		if err != nil {
 			uc.logger.Warn("failed to deserialize proxy", "error", err, "msgID", msg.ID)
-			uc.consumer.Ack(ctx, TopicVerify, GroupWorkers, msg.ID)
+			uc.consumer.Ack(ctx, uc.topic, uc.group, msg.ID)
 			continue
 		}
 
@@ -115,7 +128,7 @@ func (uc *VerifyFromQueueUseCase) Execute(ctx context.Context) error {
 			}
 		}
 
-		uc.consumer.Ack(ctx, TopicVerify, GroupWorkers, msg.ID)
+		uc.consumer.Ack(ctx, uc.topic, uc.group, msg.ID)
 
 		if processed%100 == 0 {
 			uc.logger.Info("progress", "processed", processed, "alive", alive)

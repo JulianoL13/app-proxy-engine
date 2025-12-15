@@ -73,7 +73,7 @@ func TestScheduleScrapingUseCase_runCycle(t *testing.T) {
 		publisher := &mockPublisher{}
 		serializer := &mockSerializer{}
 
-		uc := scraper.NewScheduleScrapingUseCase(scraperMock, serializer, publisher, time.Hour, logger)
+		uc := scraper.NewScheduleScrapingUseCase(scraperMock, serializer, publisher, time.Hour, logger, "test-topic")
 
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
@@ -91,7 +91,7 @@ func TestScheduleScrapingUseCase_runCycle(t *testing.T) {
 		publisher := &mockPublisher{}
 		serializer := &mockSerializer{}
 
-		uc := scraper.NewScheduleScrapingUseCase(scraperMock, serializer, publisher, time.Hour, logger)
+		uc := scraper.NewScheduleScrapingUseCase(scraperMock, serializer, publisher, time.Hour, logger, "test-topic")
 
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
@@ -111,7 +111,7 @@ func TestScheduleScrapingUseCase_runCycle(t *testing.T) {
 		publisher := &mockPublisher{err: errors.New("redis unavailable")}
 		serializer := &mockSerializer{}
 
-		uc := scraper.NewScheduleScrapingUseCase(scraperMock, serializer, publisher, time.Hour, logger)
+		uc := scraper.NewScheduleScrapingUseCase(scraperMock, serializer, publisher, time.Hour, logger, "test-topic")
 
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
@@ -130,7 +130,7 @@ func TestScheduleScrapingUseCase_runCycle(t *testing.T) {
 		publisher := &mockPublisher{}
 		serializer := &mockSerializer{err: errors.New("marshal failed")}
 
-		uc := scraper.NewScheduleScrapingUseCase(scraperMock, serializer, publisher, time.Hour, logger)
+		uc := scraper.NewScheduleScrapingUseCase(scraperMock, serializer, publisher, time.Hour, logger, "test-topic")
 
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
