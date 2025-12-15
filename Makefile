@@ -54,7 +54,7 @@ tidy:
 
 # Generate mocks using mockery
 mocks:
-	mockery
+	mockery --config config/mockery/mockery.yaml
 
 # Clean existing mocks (except logs/mocks which is manually maintained)
 clean-mocks:
