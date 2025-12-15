@@ -3,32 +3,59 @@ package http
 import (
 	"context"
 	"encoding/json"
-	"math/rand"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
 
-	"github.com/JulianoL13/app-proxy-engine/internal/common/logs"
 	"github.com/JulianoL13/app-proxy-engine/internal/proxy"
 )
 
-type Reader interface {
-	GetAlive(ctx context.Context, cursor float64, limit int) ([]*proxy.Proxy, float64, int, error)
+type Logger interface {
+	Info(msg string, args ...any)
+	Warn(msg string, args ...any)
+	Error(msg string, args ...any)
+	With(args ...any) Logger
+}
+
+type GetProxiesInput struct {
+	Cursor float64
+	Limit  int
+}
+
+type GetProxiesOutput struct {
+	Proxies    []*proxy.Proxy
+	NextCursor float64
+	Total      int
+}
+
+type GetProxiesUseCase interface {
+	Execute(ctx context.Context, input GetProxiesInput) (GetProxiesOutput, error)
+}
+
+type GetRandomProxyUseCase interface {
+	Execute(ctx context.Context) (*proxy.Proxy, error)
 }
 
 type Handler struct {
-	reader Reader
-	logger logs.Logger
+	getProxies     GetProxiesUseCase
+	getRandomProxy GetRandomProxyUseCase
+	logger         Logger
 }
 
-func NewHandler(reader Reader, logger logs.Logger) *Handler {
+func NewHandler(
+	getProxies GetProxiesUseCase,
+	getRandomProxy GetRandomProxyUseCase,
+	logger Logger,
+) *Handler {
 	return &Handler{
-		reader: reader,
-		logger: logger,
+		getProxies:     getProxies,
+		getRandomProxy: getRandomProxy,
+		logger:         logger,
 	}
 }
 
-func (h *Handler) getLogger(r *http.Request) logs.Logger {
+func (h *Handler) getLogger(r *http.Request) Logger {
 	if l := LoggerFromContext(r.Context()); l != nil {
 		return l
 	}
@@ -137,7 +164,7 @@ func (h *Handler) GetProxies(w http.ResponseWriter, r *http.Request) {
 
 	cursor, limit := parsePagination(r)
 
-	proxies, nextCursor, total, err := h.reader.GetAlive(r.Context(), cursor, limit)
+	output, err := h.getProxies.Execute(r.Context(), GetProxiesInput{Cursor: cursor, Limit: limit})
 	if err != nil {
 		logger.Error("failed to get proxies", "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -145,7 +172,7 @@ func (h *Handler) GetProxies(w http.ResponseWriter, r *http.Request) {
 	}
 
 	filters := parseFilters(r)
-	proxies = filterProxies(proxies, filters)
+	proxies := filterProxies(output.Proxies, filters)
 
 	data := make([]ProxyResponse, len(proxies))
 	for i, p := range proxies {
@@ -155,12 +182,11 @@ func (h *Handler) GetProxies(w http.ResponseWriter, r *http.Request) {
 	response := PaginatedResponse{
 		Data:       data,
 		Limit:      limit,
-		TotalCount: total,
+		TotalCount: output.Total,
 	}
 
-	// Only include next_cursor if there's more data
-	if nextCursor > 0 {
-		response.NextCursor = &nextCursor
+	if output.NextCursor > 0 {
+		response.NextCursor = &output.NextCursor
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -170,23 +196,22 @@ func (h *Handler) GetProxies(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetRandomProxy(w http.ResponseWriter, r *http.Request) {
 	logger := h.getLogger(r)
 
-	// Get all proxies (no pagination for random selection)
-	proxies, _, _, err := h.reader.GetAlive(r.Context(), 0, 0)
+	p, err := h.getRandomProxy.Execute(r.Context())
 	if err != nil {
-		logger.Error("failed to get proxies", "error", err)
+		if errors.Is(err, proxy.ErrNoProxiesAvailable) {
+			http.Error(w, "no proxies available", http.StatusNotFound)
+			return
+		}
+		logger.Error("failed to get random proxy", "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
 	filters := parseFilters(r)
-	proxies = filterProxies(proxies, filters)
-
-	if len(proxies) == 0 {
+	if !filters.matches(p) {
 		http.Error(w, "no proxies available", http.StatusNotFound)
 		return
 	}
-
-	p := proxies[rand.Intn(len(proxies))]
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(toResponse(p))

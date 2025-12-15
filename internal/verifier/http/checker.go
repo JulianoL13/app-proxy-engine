@@ -9,20 +9,25 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JulianoL13/app-proxy-engine/internal/common/logs"
 	"github.com/JulianoL13/app-proxy-engine/internal/verifier"
 )
+
+type Logger interface {
+	Info(msg string, args ...any)
+	Warn(msg string, args ...any)
+	Debug(msg string, args ...any)
+}
 
 const DefaultVerifyURL = "https://httpbin.org/ip"
 
 type Checker struct {
 	TargetURL string
 	Timeout   time.Duration
-	logger    logs.Logger
+	logger    Logger
 	realIP    string
 }
 
-func NewChecker(target string, timeout time.Duration, logger logs.Logger) *Checker {
+func NewChecker(target string, timeout time.Duration, logger Logger) *Checker {
 	if target == "" {
 		target = DefaultVerifyURL
 	}

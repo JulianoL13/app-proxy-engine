@@ -10,16 +10,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JulianoL13/app-proxy-engine/internal/common/logs"
 	"github.com/JulianoL13/app-proxy-engine/internal/scraper"
 )
 
-type Fetcher struct {
-	client *http.Client
-	logger logs.Logger
+type Logger interface {
+	Debug(msg string, args ...any)
 }
 
-func New(logger logs.Logger) *Fetcher {
+type Fetcher struct {
+	client *http.Client
+	logger Logger
+}
+
+func New(logger Logger) *Fetcher {
 	return &Fetcher{
 		client: &http.Client{
 			Timeout: 0,

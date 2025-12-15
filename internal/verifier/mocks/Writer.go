@@ -5,7 +5,7 @@ package mocks
 import (
 	context "context"
 
-	proxy "github.com/JulianoL13/app-proxy-engine/internal/proxy"
+	verifier "github.com/JulianoL13/app-proxy-engine/internal/verifier"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -23,7 +23,7 @@ func (_m *Writer) EXPECT() *Writer_Expecter {
 }
 
 // Save provides a mock function with given fields: ctx, p
-func (_m *Writer) Save(ctx context.Context, p *proxy.Proxy) error {
+func (_m *Writer) Save(ctx context.Context, p verifier.VerifiedProxy) error {
 	ret := _m.Called(ctx, p)
 
 	if len(ret) == 0 {
@@ -31,7 +31,7 @@ func (_m *Writer) Save(ctx context.Context, p *proxy.Proxy) error {
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *proxy.Proxy) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, verifier.VerifiedProxy) error); ok {
 		r0 = rf(ctx, p)
 	} else {
 		r0 = ret.Error(0)
@@ -47,14 +47,14 @@ type Writer_Save_Call struct {
 
 // Save is a helper method to define mock.On call
 //   - ctx context.Context
-//   - p *proxy.Proxy
+//   - p verifier.VerifiedProxy
 func (_e *Writer_Expecter) Save(ctx interface{}, p interface{}) *Writer_Save_Call {
 	return &Writer_Save_Call{Call: _e.mock.On("Save", ctx, p)}
 }
 
-func (_c *Writer_Save_Call) Run(run func(ctx context.Context, p *proxy.Proxy)) *Writer_Save_Call {
+func (_c *Writer_Save_Call) Run(run func(ctx context.Context, p verifier.VerifiedProxy)) *Writer_Save_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*proxy.Proxy))
+		run(args[0].(context.Context), args[1].(verifier.VerifiedProxy))
 	})
 	return _c
 }
@@ -64,7 +64,7 @@ func (_c *Writer_Save_Call) Return(_a0 error) *Writer_Save_Call {
 	return _c
 }
 
-func (_c *Writer_Save_Call) RunAndReturn(run func(context.Context, *proxy.Proxy) error) *Writer_Save_Call {
+func (_c *Writer_Save_Call) RunAndReturn(run func(context.Context, verifier.VerifiedProxy) error) *Writer_Save_Call {
 	_c.Call.Return(run)
 	return _c
 }

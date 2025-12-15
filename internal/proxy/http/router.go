@@ -3,12 +3,11 @@ package http
 import (
 	"net/http"
 
-	"github.com/JulianoL13/app-proxy-engine/internal/common/logs"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-func NewRouter(h *Handler, logger logs.Logger) http.Handler {
+func NewRouter(h *Handler, logger Logger) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)

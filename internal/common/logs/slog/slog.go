@@ -3,8 +3,6 @@ package slog
 import (
 	"log/slog"
 	"os"
-
-	"github.com/JulianoL13/app-proxy-engine/internal/common/logs"
 )
 
 type Logger struct {
@@ -45,10 +43,8 @@ func (l *Logger) Error(msg string, args ...any) {
 	l.logger.Error(msg, args...)
 }
 
-func (l *Logger) With(args ...any) logs.Logger {
+func (l *Logger) With(args ...any) *Logger {
 	return &Logger{
 		logger: l.logger.With(args...),
 	}
 }
-
-var _ logs.Logger = (*Logger)(nil)

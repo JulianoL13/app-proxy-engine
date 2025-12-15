@@ -5,9 +5,15 @@ packages:
       dir: internal/verifier/mocks
       outpkg: mocks
     interfaces:
-      ProxyChecker: 
+      ProxyChecker:
         config: {}
       Verifiable:
+        config: {}
+      Consumer:
+        config: {}
+      Writer:
+        config: {}
+      ProxyDeserializer:
         config: {}
   github.com/JulianoL13/app-proxy-engine/internal/scraper:
     config:
@@ -16,20 +22,27 @@ packages:
     interfaces:
       Fetcher:
         config: {}
+      Publisher:
+        config: {}
+      ProxyScraper:
+        config: {}
+      ProxySerializer:
+        config: {}
   github.com/JulianoL13/app-proxy-engine/internal/proxy:
     config:
       dir: internal/proxy/mocks
       outpkg: mocks
     interfaces:
-      ProxyDataInput:
-        config: {}
-      ProxySource:
-        config: {}
-      ProxyChecker:
-        config: {}
       Reader:
         config: {}
-      Writer:
+  github.com/JulianoL13/app-proxy-engine/internal/proxy/http:
+    config:
+      dir: internal/proxy/http/mocks
+      outpkg: mocks
+    interfaces:
+      GetProxiesUseCase:
+        config: {}
+      GetRandomProxyUseCase:
         config: {}
 mockname: "{{.InterfaceName}}"
 filename: "{{.InterfaceName}}.go"

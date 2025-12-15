@@ -5,9 +5,13 @@ import (
 	"fmt"
 	"sync"
 	"time"
-
-	"github.com/JulianoL13/app-proxy-engine/internal/common/logs"
 )
+
+type Logger interface {
+	Info(msg string, args ...any)
+	Warn(msg string, args ...any)
+	Debug(msg string, args ...any)
+}
 
 type Fetcher interface {
 	FetchAndParse(ctx context.Context, source Source) ([]*ScrapeOutput, error)
@@ -16,10 +20,10 @@ type Fetcher interface {
 type ScrapeProxiesUseCase struct {
 	fetcher Fetcher
 	sources []Source
-	logger  logs.Logger
+	logger  Logger
 }
 
-func NewScrapeProxiesUseCase(f Fetcher, sources []Source, logger logs.Logger) *ScrapeProxiesUseCase {
+func NewScrapeProxiesUseCase(f Fetcher, sources []Source, logger Logger) *ScrapeProxiesUseCase {
 	return &ScrapeProxiesUseCase{
 		fetcher: f,
 		sources: sources,

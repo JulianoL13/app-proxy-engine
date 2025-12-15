@@ -13,11 +13,48 @@ import (
 	"time"
 
 	"github.com/JulianoL13/app-proxy-engine/internal/common/logs/slog"
+	"github.com/JulianoL13/app-proxy-engine/internal/proxy"
 	proxyhttp "github.com/JulianoL13/app-proxy-engine/internal/proxy/http"
 	proxyredis "github.com/JulianoL13/app-proxy-engine/internal/proxy/redis"
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
 )
+
+type loggerAdapter struct {
+	inner *slog.Logger
+}
+
+func (l *loggerAdapter) Debug(msg string, args ...any) { l.inner.Debug(msg, args...) }
+func (l *loggerAdapter) Info(msg string, args ...any)  { l.inner.Info(msg, args...) }
+func (l *loggerAdapter) Warn(msg string, args ...any)  { l.inner.Warn(msg, args...) }
+func (l *loggerAdapter) Error(msg string, args ...any) { l.inner.Error(msg, args...) }
+func (l *loggerAdapter) With(args ...any) proxyhttp.Logger {
+	return &loggerAdapter{inner: l.inner.With(args...)}
+}
+
+type getProxiesAdapter struct {
+	uc *proxy.GetProxiesUseCase
+}
+
+func (a *getProxiesAdapter) Execute(ctx context.Context, input proxyhttp.GetProxiesInput) (proxyhttp.GetProxiesOutput, error) {
+	out, err := a.uc.Execute(ctx, proxy.GetProxiesInput{Cursor: input.Cursor, Limit: input.Limit})
+	if err != nil {
+		return proxyhttp.GetProxiesOutput{}, err
+	}
+	return proxyhttp.GetProxiesOutput{
+		Proxies:    out.Proxies,
+		NextCursor: out.NextCursor,
+		Total:      out.Total,
+	}, nil
+}
+
+type getRandomProxyAdapter struct {
+	uc *proxy.GetRandomProxyUseCase
+}
+
+func (a *getRandomProxyAdapter) Execute(ctx context.Context) (*proxy.Proxy, error) {
+	return a.uc.Execute(ctx)
+}
 
 type Config struct {
 	APIPort   string
@@ -30,15 +67,13 @@ type Config struct {
 func loadConfig() Config {
 	_ = godotenv.Load()
 
-	cfg := Config{
+	return Config{
 		APIPort:   getEnv("API_PORT", "8080"),
 		RedisAddr: getEnv("REDIS_ADDR", "localhost:6379"),
 		RedisPass: getEnv("REDIS_PASSWORD", ""),
 		RedisDB:   getEnvInt("REDIS_DB", 0),
 		ProxyTTL:  time.Duration(getEnvInt("PROXY_TTL_MINUTES", 30)) * time.Minute,
 	}
-
-	return cfg
 }
 
 func getEnv(key, fallback string) string {
@@ -60,8 +95,9 @@ func getEnvInt(key string, fallback int) int {
 func main() {
 	cfg := loadConfig()
 
-	logger := slog.NewJSON(logslog.LevelInfo)
-	logger.Info("starting proxy-engine API", "port", cfg.APIPort)
+	innerLogger := slog.NewJSON(logslog.LevelInfo)
+	logger := &loggerAdapter{inner: innerLogger}
+	innerLogger.Info("starting proxy-engine API", "port", cfg.APIPort)
 
 	redisClient := redis.NewClient(&redis.Options{
 		Addr:     cfg.RedisAddr,
@@ -74,14 +110,21 @@ func main() {
 	defer cancel()
 
 	if err := redisClient.Ping(ctx).Err(); err != nil {
-		logger.Error("failed to connect to redis", "error", err)
+		innerLogger.Error("failed to connect to redis", "error", err)
 		os.Exit(1)
 	}
-	logger.Info("connected to redis", "addr", cfg.RedisAddr)
+	innerLogger.Info("connected to redis", "addr", cfg.RedisAddr)
 
 	repo := proxyredis.NewRepository(redisClient).WithTTL(cfg.ProxyTTL)
 
-	handler := proxyhttp.NewHandler(repo, logger)
+	getProxiesUC := proxy.NewGetProxiesUseCase(repo, innerLogger)
+	getRandomUC := proxy.NewGetRandomProxyUseCase(repo, innerLogger)
+
+	handler := proxyhttp.NewHandler(
+		&getProxiesAdapter{uc: getProxiesUC},
+		&getRandomProxyAdapter{uc: getRandomUC},
+		logger,
+	)
 	router := proxyhttp.NewRouter(handler, logger)
 
 	server := &http.Server{

@@ -132,8 +132,3 @@ func (r *Repository) GetAlive(ctx context.Context, cursor float64, limit int) ([
 
 	return proxies, nextCursor, int(total), nil
 }
-
-var (
-	_ proxy.Writer = (*Repository)(nil)
-	_ proxy.Reader = (*Repository)(nil)
-)

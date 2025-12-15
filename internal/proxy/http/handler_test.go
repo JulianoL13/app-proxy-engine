@@ -1,25 +1,60 @@
 package http_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
-	logmocks "github.com/JulianoL13/app-proxy-engine/internal/common/logs/mocks"
 	"github.com/JulianoL13/app-proxy-engine/internal/proxy"
 	proxyhttp "github.com/JulianoL13/app-proxy-engine/internal/proxy/http"
-	"github.com/JulianoL13/app-proxy-engine/internal/proxy/mocks"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
+type testLogger struct{}
+
+func (l testLogger) Debug(msg string, args ...any) {}
+func (l testLogger) Info(msg string, args ...any)  {}
+func (l testLogger) Warn(msg string, args ...any)  {}
+func (l testLogger) Error(msg string, args ...any) {}
+func (l testLogger) With(args ...any) proxyhttp.Logger {
+	return l
+}
+
+type mockGetProxiesUseCase struct {
+	proxies    []*proxy.Proxy
+	nextCursor float64
+	total      int
+	err        error
+}
+
+func (m *mockGetProxiesUseCase) Execute(ctx context.Context, input proxyhttp.GetProxiesInput) (proxyhttp.GetProxiesOutput, error) {
+	if m.err != nil {
+		return proxyhttp.GetProxiesOutput{}, m.err
+	}
+	return proxyhttp.GetProxiesOutput{
+		Proxies:    m.proxies,
+		NextCursor: m.nextCursor,
+		Total:      m.total,
+	}, nil
+}
+
+type mockGetRandomProxyUseCase struct {
+	proxy *proxy.Proxy
+	err   error
+}
+
+func (m *mockGetRandomProxyUseCase) Execute(ctx context.Context) (*proxy.Proxy, error) {
+	return m.proxy, m.err
+}
+
 func TestHandler_Health(t *testing.T) {
-	reader := mocks.NewReader(t)
-	handler := proxyhttp.NewHandler(reader, logmocks.LoggerMock{})
-	router := proxyhttp.NewRouter(handler, logmocks.LoggerMock{})
+	logger := testLogger{}
+	handler := proxyhttp.NewHandler(&mockGetProxiesUseCase{}, &mockGetRandomProxyUseCase{}, logger)
+	router := proxyhttp.NewRouter(handler, logger)
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
@@ -37,13 +72,16 @@ func TestHandler_GetProxies(t *testing.T) {
 	p2 := proxy.NewProxy("2.2.2.2", 3128, proxy.SOCKS5, "source2")
 	p2.MarkSuccess(200*time.Millisecond, proxy.Anonymous)
 
-	t.Run("returns all proxies", func(t *testing.T) {
-		reader := mocks.NewReader(t)
-		reader.EXPECT().GetAlive(mock.Anything, float64(0), 50).
-			Return([]*proxy.Proxy{p1, p2}, float64(0), 2, nil)
+	logger := testLogger{}
 
-		handler := proxyhttp.NewHandler(reader, logmocks.LoggerMock{})
-		router := proxyhttp.NewRouter(handler, logmocks.LoggerMock{})
+	t.Run("returns all proxies", func(t *testing.T) {
+		getProxiesUC := &mockGetProxiesUseCase{
+			proxies: []*proxy.Proxy{p1, p2},
+			total:   2,
+		}
+
+		handler := proxyhttp.NewHandler(getProxiesUC, &mockGetRandomProxyUseCase{}, logger)
+		router := proxyhttp.NewRouter(handler, logger)
 
 		req := httptest.NewRequest(http.MethodGet, "/proxies", nil)
 		rec := httptest.NewRecorder()
@@ -62,12 +100,13 @@ func TestHandler_GetProxies(t *testing.T) {
 	})
 
 	t.Run("filters by protocol", func(t *testing.T) {
-		reader := mocks.NewReader(t)
-		reader.EXPECT().GetAlive(mock.Anything, float64(0), 50).
-			Return([]*proxy.Proxy{p1, p2}, float64(0), 2, nil)
+		getProxiesUC := &mockGetProxiesUseCase{
+			proxies: []*proxy.Proxy{p1, p2},
+			total:   2,
+		}
 
-		handler := proxyhttp.NewHandler(reader, logmocks.LoggerMock{})
-		router := proxyhttp.NewRouter(handler, logmocks.LoggerMock{})
+		handler := proxyhttp.NewHandler(getProxiesUC, &mockGetRandomProxyUseCase{}, logger)
+		router := proxyhttp.NewRouter(handler, logger)
 
 		req := httptest.NewRequest(http.MethodGet, "/proxies?protocol=http", nil)
 		rec := httptest.NewRecorder()
@@ -82,12 +121,13 @@ func TestHandler_GetProxies(t *testing.T) {
 	})
 
 	t.Run("filters by anonymity", func(t *testing.T) {
-		reader := mocks.NewReader(t)
-		reader.EXPECT().GetAlive(mock.Anything, float64(0), 50).
-			Return([]*proxy.Proxy{p1, p2}, float64(0), 2, nil)
+		getProxiesUC := &mockGetProxiesUseCase{
+			proxies: []*proxy.Proxy{p1, p2},
+			total:   2,
+		}
 
-		handler := proxyhttp.NewHandler(reader, logmocks.LoggerMock{})
-		router := proxyhttp.NewRouter(handler, logmocks.LoggerMock{})
+		handler := proxyhttp.NewHandler(getProxiesUC, &mockGetRandomProxyUseCase{}, logger)
+		router := proxyhttp.NewRouter(handler, logger)
 
 		req := httptest.NewRequest(http.MethodGet, "/proxies?anonymity=elite", nil)
 		rec := httptest.NewRecorder()
@@ -102,12 +142,13 @@ func TestHandler_GetProxies(t *testing.T) {
 	})
 
 	t.Run("filters by max latency", func(t *testing.T) {
-		reader := mocks.NewReader(t)
-		reader.EXPECT().GetAlive(mock.Anything, float64(0), 50).
-			Return([]*proxy.Proxy{p1, p2}, float64(0), 2, nil)
+		getProxiesUC := &mockGetProxiesUseCase{
+			proxies: []*proxy.Proxy{p1, p2},
+			total:   2,
+		}
 
-		handler := proxyhttp.NewHandler(reader, logmocks.LoggerMock{})
-		router := proxyhttp.NewRouter(handler, logmocks.LoggerMock{})
+		handler := proxyhttp.NewHandler(getProxiesUC, &mockGetRandomProxyUseCase{}, logger)
+		router := proxyhttp.NewRouter(handler, logger)
 
 		req := httptest.NewRequest(http.MethodGet, "/proxies?max_latency_ms=150", nil)
 		rec := httptest.NewRecorder()
@@ -126,13 +167,13 @@ func TestHandler_GetRandomProxy(t *testing.T) {
 	p1 := proxy.NewProxy("1.1.1.1", 8080, proxy.HTTP, "source1")
 	p1.MarkSuccess(100*time.Millisecond, proxy.Elite)
 
-	t.Run("returns a proxy", func(t *testing.T) {
-		reader := mocks.NewReader(t)
-		reader.EXPECT().GetAlive(mock.Anything, float64(0), 0).
-			Return([]*proxy.Proxy{p1}, float64(0), 1, nil)
+	logger := testLogger{}
 
-		handler := proxyhttp.NewHandler(reader, logmocks.LoggerMock{})
-		router := proxyhttp.NewRouter(handler, logmocks.LoggerMock{})
+	t.Run("returns a proxy", func(t *testing.T) {
+		getRandomUC := &mockGetRandomProxyUseCase{proxy: p1}
+
+		handler := proxyhttp.NewHandler(&mockGetProxiesUseCase{}, getRandomUC, logger)
+		router := proxyhttp.NewRouter(handler, logger)
 
 		req := httptest.NewRequest(http.MethodGet, "/proxies/random", nil)
 		rec := httptest.NewRecorder()
@@ -149,12 +190,10 @@ func TestHandler_GetRandomProxy(t *testing.T) {
 	})
 
 	t.Run("returns 404 when no proxies", func(t *testing.T) {
-		reader := mocks.NewReader(t)
-		reader.EXPECT().GetAlive(mock.Anything, float64(0), 0).
-			Return([]*proxy.Proxy{}, float64(0), 0, nil)
+		getRandomUC := &mockGetRandomProxyUseCase{err: proxy.ErrNoProxiesAvailable}
 
-		handler := proxyhttp.NewHandler(reader, logmocks.LoggerMock{})
-		router := proxyhttp.NewRouter(handler, logmocks.LoggerMock{})
+		handler := proxyhttp.NewHandler(&mockGetProxiesUseCase{}, getRandomUC, logger)
+		router := proxyhttp.NewRouter(handler, logger)
 
 		req := httptest.NewRequest(http.MethodGet, "/proxies/random", nil)
 		rec := httptest.NewRecorder()
@@ -162,27 +201,5 @@ func TestHandler_GetRandomProxy(t *testing.T) {
 		router.ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
-	})
-
-	t.Run("applies filters to random", func(t *testing.T) {
-		p2 := proxy.NewProxy("2.2.2.2", 3128, proxy.SOCKS5, "source2")
-		p2.MarkSuccess(200*time.Millisecond, proxy.Anonymous)
-
-		reader := mocks.NewReader(t)
-		reader.EXPECT().GetAlive(mock.Anything, float64(0), 0).
-			Return([]*proxy.Proxy{p1, p2}, float64(0), 2, nil)
-
-		handler := proxyhttp.NewHandler(reader, logmocks.LoggerMock{})
-		router := proxyhttp.NewRouter(handler, logmocks.LoggerMock{})
-
-		req := httptest.NewRequest(http.MethodGet, "/proxies/random?protocol=socks5", nil)
-		rec := httptest.NewRecorder()
-
-		router.ServeHTTP(rec, req)
-
-		var result proxyhttp.ProxyResponse
-		json.Unmarshal(rec.Body.Bytes(), &result)
-
-		assert.Equal(t, "socks5", result.Protocol)
 	})
 }
