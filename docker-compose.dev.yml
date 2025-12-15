@@ -1,0 +1,82 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_dev:/data
+    networks:
+      - proxy-net-dev
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - REDIS_ADDR=redis:6379
+      - REDIS_KEY_PREFIX=dev_v1
+      - API_PORT=8080
+    volumes:
+      - .:/app
+    command: air --build.cmd "go build -buildvcs=false -o ./tmp/main ./cmd/api" --build.bin "./tmp/main"
+    depends_on:
+      - redis
+    networks:
+      - proxy-net-dev
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - REDIS_ADDR=redis:6379
+      - REDIS_KEY_PREFIX=dev_v1
+      - REDIS_TOPIC_VERIFY=proxies:verify
+      - SCRAPE_INTERVAL_MINUTES=1
+    volumes:
+      - .:/app
+    command: air --build.cmd "go build -buildvcs=false -o ./tmp/main ./cmd/scheduler" --build.bin "./tmp/main"
+    depends_on:
+      - redis
+    networks:
+      - proxy-net-dev
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    deploy:
+      replicas: 1
+    environment:
+      - REDIS_ADDR=redis:6379
+      - REDIS_KEY_PREFIX=dev_v1
+      - REDIS_TOPIC_VERIFY=proxies:verify
+      - REDIS_GROUP_WORKERS=verifiers
+    volumes:
+      - .:/app
+    command: air --build.cmd "go build -buildvcs=false -o ./tmp/main ./cmd/worker" --build.bin "./tmp/main"
+    depends_on:
+      - redis
+    networks:
+      - proxy-net-dev
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - proxy-net-dev
+
+volumes:
+  redis_data_dev:
+
+
+networks:
+  proxy-net-dev:
+    driver: bridge

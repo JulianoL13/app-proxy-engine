@@ -14,6 +14,7 @@ import (
 	"github.com/JulianoL13/app-proxy-engine/internal/common/events"
 	"github.com/JulianoL13/app-proxy-engine/internal/common/logs/slog"
 	queueredis "github.com/JulianoL13/app-proxy-engine/internal/common/queue/redis"
+	"github.com/JulianoL13/app-proxy-engine/internal/common/workerpool"
 	"github.com/JulianoL13/app-proxy-engine/internal/proxy"
 	proxyredis "github.com/JulianoL13/app-proxy-engine/internal/proxy/redis"
 	"github.com/JulianoL13/app-proxy-engine/internal/verifier"
@@ -89,6 +90,7 @@ func main() {
 	redisTopic := getEnv("REDIS_TOPIC_VERIFY", "proxies:verify")
 	redisGroup := getEnv("REDIS_GROUP_WORKERS", "verifiers")
 	redisKeyPrefix := getEnv("REDIS_KEY_PREFIX", "v1")
+	concurrency := getEnvInt("WORKER_CONCURRENCY", 50)
 
 	logger := slog.NewJSON(logslog.LevelInfo)
 
@@ -107,12 +109,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	pool := workerpool.New(concurrency)
+	defer pool.Stop()
+
 	consumer := &consumerAdapter{inner: queueredis.NewStreamsClient(redisClient)}
 	checker := httpverifier.NewChecker("", verifyTimeout, logger)
 	deserializer := proxyDeserializer{}
 	writer := &writerAdapter{inner: proxyredis.NewRepository(redisClient, redisKeyPrefix).WithTTL(proxyTTL)}
 
-	uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, consumerName, redisTopic, redisGroup)
+	uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, pool, consumerName, redisTopic, redisGroup)
 
 	go func() {
 		quit := make(chan os.Signal, 1)

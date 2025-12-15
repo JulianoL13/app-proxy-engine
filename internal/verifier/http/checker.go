@@ -130,6 +130,17 @@ func (c *Checker) Verify(ctx context.Context, p verifier.Verifiable) verifier.Ve
 		}
 	}
 
+	// Validate if it is really JSON (httpbin should return JSON)
+	// Many proxies return 200 OK with HTML blocking pages
+	var dummy map[string]any
+	if err := json.Unmarshal(body, &dummy); err != nil {
+		return verifier.VerifyOutput{
+			Success: false,
+			Latency: latency,
+			Error:   fmt.Errorf("proxy returned invalid json: %w", err),
+		}
+	}
+
 	anonymity := c.detectAnonymity(body)
 
 	return verifier.VerifyOutput{

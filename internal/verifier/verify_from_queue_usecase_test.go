@@ -78,8 +78,15 @@ func (l verifierTestLogger) Info(msg string, args ...any)  {}
 func (l verifierTestLogger) Warn(msg string, args ...any)  {}
 func (l verifierTestLogger) Debug(msg string, args ...any) {}
 
+type mockWorkerPool struct{}
+
+func (m *mockWorkerPool) Submit(job func(ctx context.Context)) {
+	job(context.Background())
+}
+
 func TestVerifyFromQueueUseCase_Execute(t *testing.T) {
 	logger := verifierTestLogger{}
+	pool := &mockWorkerPool{}
 
 	t.Run("processes and saves successful proxy", func(t *testing.T) {
 		messages := make(chan verifier.Message, 1)
@@ -97,7 +104,7 @@ func TestVerifyFromQueueUseCase_Execute(t *testing.T) {
 		deserializer := &mockDeserializer{proxy: proxy}
 		writer := &mockWriter{}
 
-		uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, "test-worker", "test-topic", "test-group")
+		uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, pool, "test-worker", "test-topic", "test-group")
 
 		err := uc.Execute(context.Background())
 
@@ -119,7 +126,7 @@ func TestVerifyFromQueueUseCase_Execute(t *testing.T) {
 		deserializer := &mockDeserializer{proxy: proxy}
 		writer := &mockWriter{}
 
-		uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, "test-worker", "test-topic", "test-group")
+		uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, pool, "test-worker", "test-topic", "test-group")
 
 		err := uc.Execute(context.Background())
 
@@ -138,7 +145,7 @@ func TestVerifyFromQueueUseCase_Execute(t *testing.T) {
 		deserializer := &mockDeserializer{err: errors.New("invalid json")}
 		writer := &mockWriter{}
 
-		uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, "test-worker", "test-topic", "test-group")
+		uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, pool, "test-worker", "test-topic", "test-group")
 
 		err := uc.Execute(context.Background())
 
@@ -153,7 +160,7 @@ func TestVerifyFromQueueUseCase_Execute(t *testing.T) {
 		deserializer := &mockDeserializer{}
 		writer := &mockWriter{}
 
-		uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, "test-worker", "test-topic", "test-group")
+		uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, pool, "test-worker", "test-topic", "test-group")
 
 		err := uc.Execute(context.Background())
 
@@ -173,7 +180,7 @@ func TestVerifyFromQueueUseCase_Execute(t *testing.T) {
 		deserializer := &mockDeserializer{proxy: proxy}
 		writer := &mockWriter{err: errors.New("save failed")}
 
-		uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, "test-worker", "test-topic", "test-group")
+		uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, pool, "test-worker", "test-topic", "test-group")
 
 		err := uc.Execute(context.Background())
 

@@ -3,6 +3,7 @@ package verifier
 import (
 	"context"
 	"net/url"
+	"sync/atomic"
 	"time"
 )
 
@@ -47,12 +48,15 @@ type ProxyDeserializer interface {
 	Deserialize(payload []byte) (VerifiedProxy, error)
 }
 
+type WorkerPool interface {
+	Submit(job func(ctx context.Context))
+}
+
 type Writer interface {
 	Save(ctx context.Context, p VerifiedProxy) error
 }
 
 const (
-	// Default values if not provided via config, though we encourage explicit config
 	DefaultTopicVerify  = "proxies:verify"
 	DefaultGroupWorkers = "verifiers"
 )
@@ -63,6 +67,7 @@ type VerifyFromQueueUseCase struct {
 	deserializer ProxyDeserializer
 	writer       Writer
 	logger       Logger
+	pool         WorkerPool
 	id           string
 	topic        string
 	group        string
@@ -74,6 +79,7 @@ func NewVerifyFromQueueUseCase(
 	deserializer ProxyDeserializer,
 	writer Writer,
 	logger Logger,
+	pool WorkerPool,
 	consumerID string,
 	topic string,
 	group string,
@@ -90,6 +96,7 @@ func NewVerifyFromQueueUseCase(
 		deserializer: deserializer,
 		writer:       writer,
 		logger:       logger,
+		pool:         pool,
 		id:           consumerID,
 		topic:        topic,
 		group:        group,
@@ -104,37 +111,42 @@ func (uc *VerifyFromQueueUseCase) Execute(ctx context.Context) error {
 		return err
 	}
 
-	processed := 0
-	alive := 0
+	var (
+		processed atomic.Int64
+		alive     atomic.Int64
+	)
 
 	for msg := range messages {
-		p, err := uc.deserializer.Deserialize(msg.Payload)
-		if err != nil {
-			uc.logger.Warn("failed to deserialize proxy", "error", err, "msgID", msg.ID)
-			uc.consumer.Ack(ctx, uc.topic, uc.group, msg.ID)
-			continue
-		}
-
-		result := uc.checker.Verify(ctx, p)
-		processed++
-
-		if result.Success {
-			p.MarkSuccess(result.Latency, result.Anonymity)
-			if err := uc.writer.Save(ctx, p); err != nil {
-				uc.logger.Warn("failed to save proxy", "address", p.Address(), "error", err)
-			} else {
-				alive++
-				uc.logger.Debug("proxy verified", "address", p.Address(), "latency", result.Latency)
+		m := msg
+		uc.pool.Submit(func(_ context.Context) {
+			p, err := uc.deserializer.Deserialize(m.Payload)
+			if err != nil {
+				uc.logger.Warn("failed to deserialize proxy", "error", err, "msgID", m.ID)
+				uc.consumer.Ack(ctx, uc.topic, uc.group, m.ID)
+				return
 			}
-		}
 
-		uc.consumer.Ack(ctx, uc.topic, uc.group, msg.ID)
+			result := uc.checker.Verify(ctx, p)
+			current := processed.Add(1)
 
-		if processed%100 == 0 {
-			uc.logger.Info("progress", "processed", processed, "alive", alive)
-		}
+			if result.Success {
+				p.MarkSuccess(result.Latency, result.Anonymity)
+				if err := uc.writer.Save(ctx, p); err != nil {
+					uc.logger.Warn("failed to save proxy", "address", p.Address(), "error", err)
+				} else {
+					alive.Add(1)
+					uc.logger.Debug("proxy verified", "address", p.Address(), "latency", result.Latency)
+				}
+			}
+
+			uc.consumer.Ack(ctx, uc.topic, uc.group, m.ID)
+
+			if current%100 == 0 {
+				uc.logger.Info("progress", "processed", current, "alive", alive.Load())
+			}
+		})
 	}
 
-	uc.logger.Info("verification stopped", "processed", processed, "alive", alive)
+	uc.logger.Info("verification stopped", "processed", processed.Load(), "alive", alive.Load())
 	return nil
 }
