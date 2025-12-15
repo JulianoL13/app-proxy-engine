@@ -11,13 +11,38 @@ import (
 type ctxKey string
 
 const loggerKey ctxKey = "logger"
+const correlationIDKey ctxKey = "correlation_id"
+
+// CorrelationIDMiddleware reads X-Correlation-ID from Kong or falls back to chi's RequestID
+func CorrelationIDMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		correlationID := r.Header.Get("X-Correlation-ID")
+		if correlationID == "" {
+			correlationID = middleware.GetReqID(r.Context())
+		}
+		if correlationID == "" {
+			correlationID = "unknown"
+		}
+
+		ctx := context.WithValue(r.Context(), correlationIDKey, correlationID)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// GetCorrelationID returns the correlation ID from context
+func GetCorrelationID(ctx context.Context) string {
+	if id, ok := ctx.Value(correlationIDKey).(string); ok {
+		return id
+	}
+	return ""
+}
 
 func LoggerMiddleware(logger Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			requestID := middleware.GetReqID(r.Context())
+			correlationID := GetCorrelationID(r.Context())
 
-			contextLogger := logger.With("request_id", requestID)
+			contextLogger := logger.With("correlation_id", correlationID)
 
 			ctx := context.WithValue(r.Context(), loggerKey, contextLogger)
 			next.ServeHTTP(w, r.WithContext(ctx))
@@ -33,7 +58,7 @@ func RequestLoggerMiddleware(logger Logger) func(http.Handler) http.Handler {
 			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 
 			defer func() {
-				requestID := middleware.GetReqID(r.Context())
+				correlationID := GetCorrelationID(r.Context())
 				clientIP := r.RemoteAddr
 				if realIP := r.Header.Get("X-Real-IP"); realIP != "" {
 					clientIP = realIP
@@ -42,7 +67,7 @@ func RequestLoggerMiddleware(logger Logger) func(http.Handler) http.Handler {
 				}
 
 				logger.Info("request",
-					"request_id", requestID,
+					"correlation_id", correlationID,
 					"method", r.Method,
 					"path", r.URL.Path,
 					"status", ww.Status(),
