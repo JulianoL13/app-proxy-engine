@@ -15,6 +15,10 @@ packages:
         config: {}
       ProxyDeserializer:
         config: {}
+      VerifiedProxy:
+        config: {}
+      WorkerPool:
+        config: {}
   github.com/JulianoL13/app-proxy-engine/internal/scraper:
     config:
       dir: internal/scraper/mocks
@@ -27,6 +31,10 @@ packages:
       ProxyScraper:
         config: {}
       ProxySerializer:
+        config: {}
+      Cleaner:
+        config: {}
+      ScrapedProxy:
         config: {}
   github.com/JulianoL13/app-proxy-engine/internal/proxy:
     config:
