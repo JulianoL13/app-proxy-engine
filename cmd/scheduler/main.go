@@ -41,6 +41,8 @@ func (s proxySerializer) Serialize(p scraper.ScrapedProxy) ([]byte, error) {
 		Port:     p.Port(),
 		Protocol: p.Protocol(),
 		Source:   p.Source(),
+		Username: p.Username(),
+		Password: p.Password(),
 	}
 	return json.Marshal(event)
 }

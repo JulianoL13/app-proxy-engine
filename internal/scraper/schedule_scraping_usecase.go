@@ -19,6 +19,8 @@ type ScrapedProxy interface {
 	Port() int
 	Protocol() string
 	Source() string
+	Username() string
+	Password() string
 }
 
 type ProxyScraper interface {
@@ -107,7 +109,6 @@ func (uc *ScheduleScrapingUseCase) runCycle(ctx context.Context) {
 
 	uc.logger.Info("scrape cycle complete", "scraped", len(proxies), "published", published)
 
-	// Cleanup expired proxies from indexes
 	if uc.cleaner != nil {
 		if err := uc.cleaner.Cleanup(ctx); err != nil {
 			uc.logger.Warn("cleanup failed", "error", err)
