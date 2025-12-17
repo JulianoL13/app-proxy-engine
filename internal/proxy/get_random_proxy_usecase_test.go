@@ -41,7 +41,7 @@ func TestGetRandomProxyUseCase_Execute(t *testing.T) {
 		}
 
 		uc := proxy.NewGetRandomProxyUseCase(reader, logger)
-		result, err := uc.Execute(ctx)
+		result, err := uc.Execute(ctx, proxy.GetRandomProxyInput{})
 
 		require.NoError(t, err)
 		assert.NotNil(t, result)
@@ -54,7 +54,7 @@ func TestGetRandomProxyUseCase_Execute(t *testing.T) {
 		}
 
 		uc := proxy.NewGetRandomProxyUseCase(reader, logger)
-		_, err := uc.Execute(ctx)
+		_, err := uc.Execute(ctx, proxy.GetRandomProxyInput{})
 
 		assert.ErrorIs(t, err, proxy.ErrNoProxiesAvailable)
 	})
@@ -65,7 +65,7 @@ func TestGetRandomProxyUseCase_Execute(t *testing.T) {
 		}
 
 		uc := proxy.NewGetRandomProxyUseCase(reader, logger)
-		_, err := uc.Execute(ctx)
+		_, err := uc.Execute(ctx, proxy.GetRandomProxyInput{})
 
 		assert.Error(t, err)
 	})

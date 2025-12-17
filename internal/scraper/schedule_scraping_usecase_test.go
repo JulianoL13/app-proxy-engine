@@ -43,6 +43,14 @@ func (m *mockSerializer) Serialize(p scraper.ScrapedProxy) ([]byte, error) {
 	return []byte(p.IP()), nil
 }
 
+type mockCleaner struct {
+	err error
+}
+
+func (m *mockCleaner) Cleanup(ctx context.Context) error {
+	return m.err
+}
+
 type stubScrapedProxy struct {
 	ip       string
 	port     int
@@ -72,8 +80,9 @@ func TestScheduleScrapingUseCase_runCycle(t *testing.T) {
 		scraperMock := &mockProxyScraper{proxies: proxies}
 		publisher := &mockPublisher{}
 		serializer := &mockSerializer{}
+		cleaner := &mockCleaner{}
 
-		uc := scraper.NewScheduleScrapingUseCase(scraperMock, serializer, publisher, time.Hour, logger, "test-topic")
+		uc := scraper.NewScheduleScrapingUseCase(scraperMock, serializer, publisher, cleaner, time.Hour, logger, "test-topic")
 
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
@@ -90,8 +99,9 @@ func TestScheduleScrapingUseCase_runCycle(t *testing.T) {
 		}
 		publisher := &mockPublisher{}
 		serializer := &mockSerializer{}
+		cleaner := &mockCleaner{}
 
-		uc := scraper.NewScheduleScrapingUseCase(scraperMock, serializer, publisher, time.Hour, logger, "test-topic")
+		uc := scraper.NewScheduleScrapingUseCase(scraperMock, serializer, publisher, cleaner, time.Hour, logger, "test-topic")
 
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
@@ -110,8 +120,9 @@ func TestScheduleScrapingUseCase_runCycle(t *testing.T) {
 		scraperMock := &mockProxyScraper{proxies: proxies}
 		publisher := &mockPublisher{err: errors.New("redis unavailable")}
 		serializer := &mockSerializer{}
+		cleaner := &mockCleaner{}
 
-		uc := scraper.NewScheduleScrapingUseCase(scraperMock, serializer, publisher, time.Hour, logger, "test-topic")
+		uc := scraper.NewScheduleScrapingUseCase(scraperMock, serializer, publisher, cleaner, time.Hour, logger, "test-topic")
 
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
@@ -129,8 +140,9 @@ func TestScheduleScrapingUseCase_runCycle(t *testing.T) {
 		scraperMock := &mockProxyScraper{proxies: proxies}
 		publisher := &mockPublisher{}
 		serializer := &mockSerializer{err: errors.New("marshal failed")}
+		cleaner := &mockCleaner{}
 
-		uc := scraper.NewScheduleScrapingUseCase(scraperMock, serializer, publisher, time.Hour, logger, "test-topic")
+		uc := scraper.NewScheduleScrapingUseCase(scraperMock, serializer, publisher, cleaner, time.Hour, logger, "test-topic")
 
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()

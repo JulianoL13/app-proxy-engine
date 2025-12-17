@@ -44,6 +44,9 @@ func (m *mockGetProxiesUseCase) Execute(ctx context.Context, input proxyhttp.Get
 		if input.Anonymity != "" && string(p.Anonymity) != input.Anonymity {
 			continue
 		}
+		if input.MaxLatency > 0 && p.Latency > input.MaxLatency {
+			continue
+		}
 		filtered = append(filtered, p)
 	}
 
@@ -59,7 +62,7 @@ type mockGetRandomProxyUseCase struct {
 	err   error
 }
 
-func (m *mockGetRandomProxyUseCase) Execute(ctx context.Context) (*proxy.Proxy, error) {
+func (m *mockGetRandomProxyUseCase) Execute(ctx context.Context, input proxyhttp.GetRandomProxyInput) (*proxy.Proxy, error) {
 	return m.proxy, m.err
 }
 
@@ -107,7 +110,7 @@ func TestHandler_GetProxies(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Len(t, result.Data, 2)
-		assert.Equal(t, 50, result.Limit)
+		assert.Equal(t, 25, result.Limit)
 		assert.Equal(t, 2, result.TotalCount)
 	})
 
