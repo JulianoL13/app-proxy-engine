@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"time"
 )
 
 type GetProxiesLogger interface {
@@ -9,8 +10,9 @@ type GetProxiesLogger interface {
 }
 
 type FilterOptions struct {
-	Protocol  string
-	Anonymity string
+	Protocol   string
+	Anonymity  string
+	MaxLatency time.Duration
 }
 
 type Reader interface {
@@ -18,10 +20,11 @@ type Reader interface {
 }
 
 type GetProxiesInput struct {
-	Cursor    float64
-	Limit     int
-	Protocol  string
-	Anonymity string
+	Cursor     float64
+	Limit      int
+	Protocol   string
+	Anonymity  string
+	MaxLatency time.Duration
 }
 
 type GetProxiesOutput struct {
@@ -44,8 +47,9 @@ func NewGetProxiesUseCase(reader Reader, logger GetProxiesLogger) *GetProxiesUse
 
 func (uc *GetProxiesUseCase) Execute(ctx context.Context, input GetProxiesInput) (GetProxiesOutput, error) {
 	filters := FilterOptions{
-		Protocol:  input.Protocol,
-		Anonymity: input.Anonymity,
+		Protocol:   input.Protocol,
+		Anonymity:  input.Anonymity,
+		MaxLatency: input.MaxLatency,
 	}
 
 	proxies, nextCursor, total, err := uc.reader.GetAlive(ctx, input.Cursor, input.Limit, filters)
