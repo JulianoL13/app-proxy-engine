@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"strconv"
@@ -12,6 +13,8 @@ import (
 
 	"github.com/JulianoL13/app-proxy-engine/internal/scraper"
 )
+
+const maxBodySize = 10 * 1024 * 1024 // 10MB
 
 type Logger interface {
 	Debug(msg string, args ...any)
@@ -54,8 +57,10 @@ func (f *Fetcher) FetchAndParse(ctx context.Context, source scraper.Source) ([]*
 		return nil, fmt.Errorf("source %s: status %d: %w", source.Name, resp.StatusCode, scraper.ErrSourceUnavailable)
 	}
 
+	limitedReader := io.LimitReader(resp.Body, maxBodySize)
+
 	var proxies []*scraper.ScrapeOutput
-	scanner := bufio.NewScanner(resp.Body)
+	scanner := bufio.NewScanner(limitedReader)
 	for scanner.Scan() {
 		if ctx.Err() != nil {
 			return proxies, ctx.Err()
@@ -83,7 +88,7 @@ func (f *Fetcher) FetchAndParse(ctx context.Context, source scraper.Source) ([]*
 
 func parseLine(line string, source scraper.Source) (*scraper.ScrapeOutput, error) {
 	parts := strings.Split(line, ":")
-	if len(parts) != 2 {
+	if len(parts) < 2 {
 		return nil, fmt.Errorf("invalid format")
 	}
 
@@ -97,6 +102,13 @@ func parseLine(line string, source scraper.Source) (*scraper.ScrapeOutput, error
 	port, err := strconv.Atoi(portStr)
 	if err != nil || port <= 0 || port > 65535 {
 		return nil, fmt.Errorf("invalid port")
+	}
+
+	// Format: IP:Port:User:Pass
+	if len(parts) == 4 {
+		username := strings.TrimSpace(parts[2])
+		password := strings.TrimSpace(parts[3])
+		return scraper.NewScrapeOutputWithAuth(ip, port, source.Type, source.Name, username, password), nil
 	}
 
 	return scraper.NewScrapeOutput(ip, port, source.Type, source.Name), nil
