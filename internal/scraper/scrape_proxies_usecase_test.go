@@ -37,7 +37,7 @@ func TestScrapeProxiesUseCase_Execute(t *testing.T) {
 		mockFetcher.On("FetchAndParse", mock.Anything, sources[0]).Return([]*scraper.ScrapeOutput{proxy1}, nil)
 		mockFetcher.On("FetchAndParse", mock.Anything, sources[1]).Return([]*scraper.ScrapeOutput{proxy2, proxyDuplicate}, nil)
 
-		uc := scraper.NewScrapeProxiesUseCase(mockFetcher, sources, logger)
+		uc := scraper.NewScrapeProxiesUseCase(mockFetcher, sources, logger, 45*time.Second)
 
 		timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
@@ -58,7 +58,7 @@ func TestScrapeProxiesUseCase_Execute(t *testing.T) {
 
 		mockFetcher.On("FetchAndParse", mock.Anything, sources[0]).Return(nil, errors.New("network error"))
 
-		uc := scraper.NewScrapeProxiesUseCase(mockFetcher, sources, logger)
+		uc := scraper.NewScrapeProxiesUseCase(mockFetcher, sources, logger, 45*time.Second)
 		result, errs := uc.Execute(ctx)
 
 		assert.Len(t, errs, 1)

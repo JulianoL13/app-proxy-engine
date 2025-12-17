@@ -18,16 +18,18 @@ type Fetcher interface {
 }
 
 type ScrapeProxiesUseCase struct {
-	fetcher Fetcher
-	sources []Source
-	logger  Logger
+	fetcher       Fetcher
+	sources       []Source
+	logger        Logger
+	sourceTimeout time.Duration
 }
 
-func NewScrapeProxiesUseCase(f Fetcher, sources []Source, logger Logger) *ScrapeProxiesUseCase {
+func NewScrapeProxiesUseCase(f Fetcher, sources []Source, logger Logger, sourceTimeout time.Duration) *ScrapeProxiesUseCase {
 	return &ScrapeProxiesUseCase{
-		fetcher: f,
-		sources: sources,
-		logger:  logger,
+		fetcher:       f,
+		sources:       sources,
+		logger:        logger,
+		sourceTimeout: sourceTimeout,
 	}
 }
 
@@ -43,7 +45,7 @@ func (uc *ScrapeProxiesUseCase) Execute(ctx context.Context) ([]*ScrapeOutput, [
 		go func(source Source) {
 			defer wg.Done()
 
-			timeoutCtx, cancel := context.WithTimeout(ctx, 45*time.Second)
+			timeoutCtx, cancel := context.WithTimeout(ctx, uc.sourceTimeout)
 			defer cancel()
 
 			proxies, err := uc.fetcher.FetchAndParse(timeoutCtx, source)
