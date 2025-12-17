@@ -38,10 +38,11 @@ type getProxiesAdapter struct {
 
 func (a *getProxiesAdapter) Execute(ctx context.Context, input proxyhttp.GetProxiesInput) (proxyhttp.GetProxiesOutput, error) {
 	out, err := a.uc.Execute(ctx, proxy.GetProxiesInput{
-		Cursor:    input.Cursor,
-		Limit:     input.Limit,
-		Protocol:  input.Protocol,
-		Anonymity: input.Anonymity,
+		Cursor:     input.Cursor,
+		Limit:      input.Limit,
+		Protocol:   input.Protocol,
+		Anonymity:  input.Anonymity,
+		MaxLatency: input.MaxLatency,
 	})
 	if err != nil {
 		return proxyhttp.GetProxiesOutput{}, err
@@ -57,8 +58,12 @@ type getRandomProxyAdapter struct {
 	uc *proxy.GetRandomProxyUseCase
 }
 
-func (a *getRandomProxyAdapter) Execute(ctx context.Context) (*proxy.Proxy, error) {
-	return a.uc.Execute(ctx)
+func (a *getRandomProxyAdapter) Execute(ctx context.Context, input proxyhttp.GetRandomProxyInput) (*proxy.Proxy, error) {
+	return a.uc.Execute(ctx, proxy.GetRandomProxyInput{
+		Protocol:   input.Protocol,
+		Anonymity:  input.Anonymity,
+		MaxLatency: input.MaxLatency,
+	})
 }
 
 type Config struct {

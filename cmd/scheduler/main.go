@@ -15,6 +15,7 @@ import (
 	queueredis "github.com/JulianoL13/app-proxy-engine/internal/common/queue/redis"
 	"github.com/JulianoL13/app-proxy-engine/internal/scraper"
 	httpclient "github.com/JulianoL13/app-proxy-engine/internal/scraper/http"
+	scraperredis "github.com/JulianoL13/app-proxy-engine/internal/scraper/redis"
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
 )
@@ -50,8 +51,10 @@ func main() {
 	redisAddr := getEnv("REDIS_ADDR", "localhost:6379")
 	redisPass := getEnv("REDIS_PASSWORD", "")
 	redisDB := getEnvInt("REDIS_DB", 0)
+	redisKeyPrefix := getEnv("REDIS_KEY_PREFIX", "proxies")
 	scrapeInterval := time.Duration(getEnvInt("SCRAPE_INTERVAL_MINUTES", 30)) * time.Minute
 	redisTopic := getEnv("REDIS_TOPIC_VERIFY", "proxies:verify")
+	sourceTimeout := time.Duration(getEnvInt("SOURCE_TIMEOUT_SECONDS", 45)) * time.Second
 
 	logger := slog.NewJSON(logslog.LevelInfo)
 
@@ -73,12 +76,14 @@ func main() {
 	publisher := queueredis.NewStreamsClient(redisClient)
 	fetcher := httpclient.New(logger)
 	sources := scraper.PublicSources()
-	scrapeUC := scraper.NewScrapeProxiesUseCase(fetcher, sources, logger)
+	scrapeUC := scraper.NewScrapeProxiesUseCase(fetcher, sources, logger, sourceTimeout)
+
+	cleaner := scraperredis.NewCleaner(redisClient, redisKeyPrefix)
 
 	scraperAdapt := &scraperAdapter{uc: scrapeUC}
 	serializer := proxySerializer{}
 
-	uc := scraper.NewScheduleScrapingUseCase(scraperAdapt, serializer, publisher, scrapeInterval, logger, redisTopic)
+	uc := scraper.NewScheduleScrapingUseCase(scraperAdapt, serializer, publisher, cleaner, scrapeInterval, logger, redisTopic)
 
 	go func() {
 		quit := make(chan os.Signal, 1)
