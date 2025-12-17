@@ -6,6 +6,8 @@ on:
   pull_request:
     branches: [main, develop]
 
+  workflow_call:
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -27,7 +29,7 @@ jobs:
 
   test:
     name: Test
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 

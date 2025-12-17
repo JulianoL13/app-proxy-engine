@@ -14,7 +14,11 @@ env:
   IMAGE_PREFIX: ${{ github.repository_owner }}/proxy-engine
 
 jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
   build:
+    needs: [ci]
     name: Build ${{ matrix.service }}
     runs-on: ubuntu-latest
     permissions:
