@@ -56,11 +56,6 @@ type Writer interface {
 	Save(ctx context.Context, p VerifiedProxy) error
 }
 
-const (
-	DefaultTopicVerify  = "proxies:verify"
-	DefaultGroupWorkers = "verifiers"
-)
-
 type VerifyFromQueueUseCase struct {
 	consumer     Consumer
 	checker      ProxyChecker
@@ -84,12 +79,6 @@ func NewVerifyFromQueueUseCase(
 	topic string,
 	group string,
 ) *VerifyFromQueueUseCase {
-	if topic == "" {
-		topic = DefaultTopicVerify
-	}
-	if group == "" {
-		group = DefaultGroupWorkers
-	}
 	return &VerifyFromQueueUseCase{
 		consumer:     consumer,
 		checker:      checker,
