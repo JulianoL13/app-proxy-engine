@@ -62,6 +62,8 @@ func (s *stubScrapedProxy) IP() string       { return s.ip }
 func (s *stubScrapedProxy) Port() int        { return s.port }
 func (s *stubScrapedProxy) Protocol() string { return s.protocol }
 func (s *stubScrapedProxy) Source() string   { return s.source }
+func (s *stubScrapedProxy) Username() string { return "" }
+func (s *stubScrapedProxy) Password() string { return "" }
 
 type schedulerTestLogger struct{}
 
