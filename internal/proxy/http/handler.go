@@ -2,8 +2,10 @@ package http
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -18,11 +20,37 @@ type Logger interface {
 	With(args ...any) Logger
 }
 
+type FieldError struct {
+	Field   string `json:"field"`
+	Message string `json:"message"`
+}
+
+type ValidationError struct {
+	Errors []FieldError `json:"errors"`
+}
+
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+
+func writeValidationError(w http.ResponseWriter, errs []FieldError) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusBadRequest)
+	json.NewEncoder(w).Encode(ValidationError{Errors: errs})
+}
+
+func writeError(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(ErrorResponse{Error: message})
+}
+
 type GetProxiesInput struct {
-	Cursor    float64
-	Limit     int
-	Protocol  string
-	Anonymity string
+	Cursor     float64
+	Limit      int
+	Protocol   string
+	Anonymity  string
+	MaxLatency time.Duration
 }
 
 type GetProxiesOutput struct {
@@ -35,8 +63,14 @@ type GetProxiesUseCase interface {
 	Execute(ctx context.Context, input GetProxiesInput) (GetProxiesOutput, error)
 }
 
+type GetRandomProxyInput struct {
+	Protocol   string
+	Anonymity  string
+	MaxLatency time.Duration
+}
+
 type GetRandomProxyUseCase interface {
-	Execute(ctx context.Context) (*proxy.Proxy, error)
+	Execute(ctx context.Context, input GetRandomProxyInput) (*proxy.Proxy, error)
 }
 
 type Handler struct {
@@ -82,68 +116,107 @@ func toResponse(p *proxy.Proxy) ProxyResponse {
 	}
 }
 
-type ProxyFilter struct {
-	Protocol   string
-	Anonymity  string
-	MaxLatency time.Duration
-}
-
 type PaginatedResponse struct {
 	Data       []ProxyResponse `json:"data"`
-	NextCursor *float64        `json:"next_cursor,omitempty"`
+	NextCursor *string         `json:"next_cursor,omitempty"`
 	Limit      int             `json:"limit"`
 	TotalCount int             `json:"total_count"`
 }
 
-const defaultLimit = 50
+const (
+	defaultLimit = 25
+	maxLimit     = 100
+)
 
-func parsePagination(r *http.Request) (cursor float64, limit int) {
+var (
+	validProtocols   = []string{"http", "https", "socks4", "socks5"}
+	validAnonymities = []string{"transparent", "anonymous", "elite"}
+)
+
+func isValidEnum(value string, validValues []string) bool {
+	for _, v := range validValues {
+		if value == v {
+			return true
+		}
+	}
+	return false
+}
+
+func encodeCursor(score float64) string {
+	return base64.RawURLEncoding.EncodeToString([]byte(fmt.Sprintf("%f", score)))
+}
+
+func decodeCursor(cursor string) (float64, error) {
+	decoded, err := base64.RawURLEncoding.DecodeString(cursor)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.ParseFloat(string(decoded), 64)
+}
+
+func parsePagination(r *http.Request) (cursor float64, limit int, errs []FieldError) {
 	q := r.URL.Query()
-
 	limit = defaultLimit
 
 	if c := q.Get("cursor"); c != "" {
-		if val, err := strconv.ParseFloat(c, 64); err == nil && val >= 0 {
+		val, err := decodeCursor(c)
+		if err != nil {
+			errs = append(errs, FieldError{Field: "cursor", Message: "invalid cursor format"})
+		} else if val < 0 {
+			errs = append(errs, FieldError{Field: "cursor", Message: "invalid cursor"})
+		} else {
 			cursor = val
 		}
 	}
 
 	if l := q.Get("limit"); l != "" {
-		if val, err := strconv.Atoi(l); err == nil && val > 0 {
+		val, err := strconv.Atoi(l)
+		if err != nil {
+			errs = append(errs, FieldError{Field: "limit", Message: "must be a valid integer"})
+		} else if val <= 0 {
+			errs = append(errs, FieldError{Field: "limit", Message: "must be positive"})
+		} else {
 			limit = val
+			if limit > maxLimit {
+				limit = maxLimit
+			}
 		}
 	}
 
-	return cursor, limit
+	return cursor, limit, errs
 }
 
-func parseFilters(r *http.Request) ProxyFilter {
-	f := ProxyFilter{}
+func parseFilters(r *http.Request) (protocol, anonymity string, maxLatency time.Duration, errs []FieldError) {
 	q := r.URL.Query()
 
-	f.Protocol = q.Get("protocol")
-	f.Anonymity = q.Get("anonymity")
-
-	if ms := q.Get("max_latency_ms"); ms != "" {
-		if val, err := strconv.ParseInt(ms, 10, 64); err == nil {
-			f.MaxLatency = time.Duration(val) * time.Millisecond
+	if p := q.Get("protocol"); p != "" {
+		if !isValidEnum(p, validProtocols) {
+			errs = append(errs, FieldError{Field: "protocol", Message: "must be one of: http, https, socks4, socks5"})
+		} else {
+			protocol = p
 		}
 	}
 
-	return f
-}
+	if a := q.Get("anonymity"); a != "" {
+		if !isValidEnum(a, validAnonymities) {
+			errs = append(errs, FieldError{Field: "anonymity", Message: "must be one of: transparent, anonymous, elite"})
+		} else {
+			anonymity = a
+		}
+	}
 
-func (f ProxyFilter) matches(p *proxy.Proxy) bool {
-	if f.Protocol != "" && string(p.Protocol) != f.Protocol {
-		return false
+	if ms := q.Get("max_latency_ms"); ms != "" {
+		val, err := strconv.ParseInt(ms, 10, 64)
+		if err != nil {
+			errs = append(errs, FieldError{Field: "max_latency_ms", Message: "must be a valid integer"})
+		} else if val <= 0 {
+			errs = append(errs, FieldError{Field: "max_latency_ms", Message: "must be positive"})
+		} else {
+			maxLatency = time.Duration(val) * time.Millisecond
+		}
 	}
-	if f.Anonymity != "" && string(p.Anonymity) != f.Anonymity {
-		return false
-	}
-	if f.MaxLatency > 0 && p.Latency > f.MaxLatency {
-		return false
-	}
-	return true
+
+	return protocol, anonymity, maxLatency, errs
 }
 
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
@@ -154,36 +227,30 @@ func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetProxies(w http.ResponseWriter, r *http.Request) {
 	logger := h.getLogger(r)
 
-	cursor, limit := parsePagination(r)
-	filters := parseFilters(r)
+	cursor, limit, paginationErrs := parsePagination(r)
+	protocol, anonymity, maxLatency, filterErrs := parseFilters(r)
 
-	output, err := h.getProxies.Execute(r.Context(), GetProxiesInput{
-		Cursor:    cursor,
-		Limit:     limit,
-		Protocol:  filters.Protocol,
-		Anonymity: filters.Anonymity,
-	})
-	if err != nil {
-		logger.Error("failed to get proxies", "error", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+	allErrs := append(paginationErrs, filterErrs...)
+	if len(allErrs) > 0 {
+		writeValidationError(w, allErrs)
 		return
 	}
 
-	// Filter by Latency (in memory still, as Redis doesn't index latency yet)
-	// Protocol and Anonymity are handled by UseCase -> Repository
-	proxies := output.Proxies
-	if filters.MaxLatency > 0 {
-		filtered := make([]*proxy.Proxy, 0, len(proxies))
-		for _, p := range proxies {
-			if p.Latency <= filters.MaxLatency {
-				filtered = append(filtered, p)
-			}
-		}
-		proxies = filtered
+	output, err := h.getProxies.Execute(r.Context(), GetProxiesInput{
+		Cursor:     cursor,
+		Limit:      limit,
+		Protocol:   protocol,
+		Anonymity:  anonymity,
+		MaxLatency: maxLatency,
+	})
+	if err != nil {
+		logger.Error("failed to get proxies", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
 	}
 
-	data := make([]ProxyResponse, len(proxies))
-	for i, p := range proxies {
+	data := make([]ProxyResponse, len(output.Proxies))
+	for i, p := range output.Proxies {
 		data[i] = toResponse(p)
 	}
 
@@ -194,7 +261,8 @@ func (h *Handler) GetProxies(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if output.NextCursor > 0 {
-		response.NextCursor = &output.NextCursor
+		encoded := encodeCursor(output.NextCursor)
+		response.NextCursor = &encoded
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -204,20 +272,24 @@ func (h *Handler) GetProxies(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetRandomProxy(w http.ResponseWriter, r *http.Request) {
 	logger := h.getLogger(r)
 
-	p, err := h.getRandomProxy.Execute(r.Context())
-	if err != nil {
-		if errors.Is(err, proxy.ErrNoProxiesAvailable) {
-			http.Error(w, "no proxies available", http.StatusNotFound)
-			return
-		}
-		logger.Error("failed to get random proxy", "error", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+	protocol, anonymity, maxLatency, errs := parseFilters(r)
+	if len(errs) > 0 {
+		writeValidationError(w, errs)
 		return
 	}
 
-	filters := parseFilters(r)
-	if !filters.matches(p) {
-		http.Error(w, "no proxies available", http.StatusNotFound)
+	p, err := h.getRandomProxy.Execute(r.Context(), GetRandomProxyInput{
+		Protocol:   protocol,
+		Anonymity:  anonymity,
+		MaxLatency: maxLatency,
+	})
+	if err != nil {
+		if errors.Is(err, proxy.ErrNoProxiesAvailable) {
+			writeError(w, http.StatusNotFound, "no proxies available")
+			return
+		}
+		logger.Error("failed to get random proxy", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 
