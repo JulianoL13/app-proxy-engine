@@ -1,0 +1,38 @@
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - gosimple
+    - ineffassign
+    - typecheck
+    - gofmt
+    - goimports
+    - misspell
+    - unconvert
+    - goconst
+    - gosec
+    - prealloc
+
+linters-settings:
+  gofmt:
+    simplify: true
+  goimports:
+    local-prefixes: github.com/JulianoL13/app-proxy-engine
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+
+
+issues:
+  exclude-dirs:
+    - mocks
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gosec
+        - goconst

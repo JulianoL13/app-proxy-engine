@@ -44,6 +44,11 @@ fmt:
 	go fmt ./...
 	goimports -w -local github.com/JulianoL13/app-proxy-engine .
 
+# Run linter
+lint:
+	golangci-lint run
+
+
 # Run go vet
 vet:
 	go vet ./...
