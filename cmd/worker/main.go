@@ -109,7 +109,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	pool := workerpool.New(concurrency)
+	pool, err := workerpool.New(concurrency)
+	if err != nil {
+		logger.Error("failed to create worker pool", "error", err)
+		os.Exit(1)
+	}
 	defer pool.Stop()
 
 	consumer := &consumerAdapter{inner: queueredis.NewStreamsClient(redisClient)}

@@ -49,7 +49,7 @@ type ProxyDeserializer interface {
 }
 
 type WorkerPool interface {
-	Submit(job func(ctx context.Context))
+	Submit(ctx context.Context, job func(ctx context.Context)) error
 }
 
 type Writer interface {
@@ -107,7 +107,7 @@ func (uc *VerifyFromQueueUseCase) Execute(ctx context.Context) error {
 
 	for msg := range messages {
 		m := msg
-		uc.pool.Submit(func(_ context.Context) {
+		if err := uc.pool.Submit(ctx, func(jobCtx context.Context) {
 			p, err := uc.deserializer.Deserialize(m.Payload)
 			if err != nil {
 				uc.logger.Warn("failed to deserialize proxy", "error", err, "msgID", m.ID)
@@ -133,7 +133,10 @@ func (uc *VerifyFromQueueUseCase) Execute(ctx context.Context) error {
 			if current%100 == 0 {
 				uc.logger.Info("progress", "processed", current, "alive", alive.Load())
 			}
-		})
+		}); err != nil {
+			uc.logger.Warn("failed to submit job", "error", err)
+			break
+		}
 	}
 
 	uc.logger.Info("verification stopped", "processed", processed.Load(), "alive", alive.Load())

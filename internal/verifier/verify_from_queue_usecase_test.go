@@ -80,8 +80,9 @@ func (l verifierTestLogger) Debug(msg string, args ...any) {}
 
 type mockWorkerPool struct{}
 
-func (m *mockWorkerPool) Submit(job func(ctx context.Context)) {
-	job(context.Background())
+func (m *mockWorkerPool) Submit(ctx context.Context, job func(ctx context.Context)) error {
+	job(ctx)
+	return nil
 }
 
 func TestVerifyFromQueueUseCase_Execute(t *testing.T) {

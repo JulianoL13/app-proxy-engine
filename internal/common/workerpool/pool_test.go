@@ -65,13 +65,15 @@ func TestPool_Submit(t *testing.T) {
 		require.NoError(t, err)
 		defer pool.Stop()
 
-		ctx := context.WithValue(context.Background(), "key", "value")
+		type contextKey string
+		const key contextKey = "key"
+		ctx := context.WithValue(context.Background(), key, "value")
 		var receivedValue string
 		var wg sync.WaitGroup
 		wg.Add(1)
 
 		err = pool.Submit(ctx, func(ctx context.Context) {
-			receivedValue = ctx.Value("key").(string)
+			receivedValue = ctx.Value(key).(string)
 			wg.Done()
 		})
 		require.NoError(t, err)
