@@ -6,20 +6,10 @@ import (
 	"testing"
 
 	"github.com/JulianoL13/app-proxy-engine/internal/proxy"
+	"github.com/JulianoL13/app-proxy-engine/internal/proxy/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-type getProxiesMockReader struct {
-	proxies    []*proxy.Proxy
-	nextCursor float64
-	total      int
-	err        error
-}
-
-func (m *getProxiesMockReader) GetAlive(ctx context.Context, cursor float64, limit int, filter proxy.FilterOptions) ([]*proxy.Proxy, float64, int, error) {
-	return m.proxies, m.nextCursor, m.total, m.err
-}
 
 type getProxiesTestLogger struct{}
 
@@ -33,11 +23,10 @@ func TestGetProxiesUseCase_Execute(t *testing.T) {
 		p1 := proxy.NewProxy("1.1.1.1", 8080, proxy.HTTP, "source1")
 		p2 := proxy.NewProxy("2.2.2.2", 3128, proxy.SOCKS5, "source2")
 
-		reader := &getProxiesMockReader{
-			proxies:    []*proxy.Proxy{p1, p2},
-			nextCursor: 1234.5,
-			total:      100,
-		}
+		reader := mocks.NewReader(t)
+		reader.EXPECT().
+			GetAlive(ctx, float64(0), 50, proxy.FilterOptions{}).
+			Return([]*proxy.Proxy{p1, p2}, 1234.5, 100, nil)
 
 		uc := proxy.NewGetProxiesUseCase(reader, logger)
 		output, err := uc.Execute(ctx, proxy.GetProxiesInput{Cursor: 0, Limit: 50})
@@ -49,10 +38,10 @@ func TestGetProxiesUseCase_Execute(t *testing.T) {
 	})
 
 	t.Run("returns empty when no proxies", func(t *testing.T) {
-		reader := &getProxiesMockReader{
-			proxies: []*proxy.Proxy{},
-			total:   0,
-		}
+		reader := mocks.NewReader(t)
+		reader.EXPECT().
+			GetAlive(ctx, float64(0), 50, proxy.FilterOptions{}).
+			Return([]*proxy.Proxy{}, float64(0), 0, nil)
 
 		uc := proxy.NewGetProxiesUseCase(reader, logger)
 		output, err := uc.Execute(ctx, proxy.GetProxiesInput{Cursor: 0, Limit: 50})
@@ -63,9 +52,10 @@ func TestGetProxiesUseCase_Execute(t *testing.T) {
 	})
 
 	t.Run("propagates reader error", func(t *testing.T) {
-		reader := &getProxiesMockReader{
-			err: errors.New("redis connection failed"),
-		}
+		reader := mocks.NewReader(t)
+		reader.EXPECT().
+			GetAlive(ctx, float64(0), 0, proxy.FilterOptions{}).
+			Return(nil, float64(0), 0, errors.New("redis connection failed"))
 
 		uc := proxy.NewGetProxiesUseCase(reader, logger)
 		_, err := uc.Execute(ctx, proxy.GetProxiesInput{})

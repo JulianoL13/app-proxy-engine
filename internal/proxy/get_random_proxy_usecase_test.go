@@ -7,20 +7,11 @@ import (
 	"time"
 
 	"github.com/JulianoL13/app-proxy-engine/internal/proxy"
+	"github.com/JulianoL13/app-proxy-engine/internal/proxy/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
-
-type getRandomMockReader struct {
-	proxies    []*proxy.Proxy
-	nextCursor float64
-	total      int
-	err        error
-}
-
-func (m *getRandomMockReader) GetAlive(ctx context.Context, cursor float64, limit int, filter proxy.FilterOptions) ([]*proxy.Proxy, float64, int, error) {
-	return m.proxies, m.nextCursor, m.total, m.err
-}
 
 type getRandomTestLogger struct{}
 
@@ -35,10 +26,10 @@ func TestGetRandomProxyUseCase_Execute(t *testing.T) {
 		p1 := proxy.NewProxy("1.1.1.1", 8080, proxy.HTTP, "source1")
 		p1.MarkSuccess(100*time.Millisecond, proxy.Elite)
 
-		reader := &getRandomMockReader{
-			proxies: []*proxy.Proxy{p1},
-			total:   1,
-		}
+		reader := mocks.NewReader(t)
+		reader.EXPECT().
+			GetAlive(ctx, float64(0), 0, mock.AnythingOfType("proxy.FilterOptions")).
+			Return([]*proxy.Proxy{p1}, float64(0), 1, nil)
 
 		uc := proxy.NewGetRandomProxyUseCase(reader, logger)
 		result, err := uc.Execute(ctx, proxy.GetRandomProxyInput{})
@@ -49,9 +40,10 @@ func TestGetRandomProxyUseCase_Execute(t *testing.T) {
 	})
 
 	t.Run("returns error when no proxies", func(t *testing.T) {
-		reader := &getRandomMockReader{
-			proxies: []*proxy.Proxy{},
-		}
+		reader := mocks.NewReader(t)
+		reader.EXPECT().
+			GetAlive(ctx, float64(0), 0, mock.AnythingOfType("proxy.FilterOptions")).
+			Return([]*proxy.Proxy{}, float64(0), 0, nil)
 
 		uc := proxy.NewGetRandomProxyUseCase(reader, logger)
 		_, err := uc.Execute(ctx, proxy.GetRandomProxyInput{})
@@ -60,9 +52,10 @@ func TestGetRandomProxyUseCase_Execute(t *testing.T) {
 	})
 
 	t.Run("propagates reader error", func(t *testing.T) {
-		reader := &getRandomMockReader{
-			err: errors.New("database error"),
-		}
+		reader := mocks.NewReader(t)
+		reader.EXPECT().
+			GetAlive(ctx, float64(0), 0, mock.AnythingOfType("proxy.FilterOptions")).
+			Return(nil, float64(0), 0, errors.New("database error"))
 
 		uc := proxy.NewGetRandomProxyUseCase(reader, logger)
 		_, err := uc.Execute(ctx, proxy.GetRandomProxyInput{})

@@ -7,63 +7,10 @@ import (
 	"time"
 
 	"github.com/JulianoL13/app-proxy-engine/internal/scraper"
+	"github.com/JulianoL13/app-proxy-engine/internal/scraper/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
-
-type mockProxyScraper struct {
-	proxies []scraper.ScrapedProxy
-	errs    []error
-}
-
-func (m *mockProxyScraper) Execute(ctx context.Context) ([]scraper.ScrapedProxy, []error) {
-	return m.proxies, m.errs
-}
-
-type mockPublisher struct {
-	published [][]byte
-	err       error
-}
-
-func (m *mockPublisher) Publish(ctx context.Context, topic string, payload []byte) error {
-	if m.err != nil {
-		return m.err
-	}
-	m.published = append(m.published, payload)
-	return nil
-}
-
-type mockSerializer struct {
-	err error
-}
-
-func (m *mockSerializer) Serialize(p scraper.ScrapedProxy) ([]byte, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	return []byte(p.IP()), nil
-}
-
-type mockCleaner struct {
-	err error
-}
-
-func (m *mockCleaner) Cleanup(ctx context.Context) error {
-	return m.err
-}
-
-type stubScrapedProxy struct {
-	ip       string
-	port     int
-	protocol string
-	source   string
-}
-
-func (s *stubScrapedProxy) IP() string       { return s.ip }
-func (s *stubScrapedProxy) Port() int        { return s.port }
-func (s *stubScrapedProxy) Protocol() string { return s.protocol }
-func (s *stubScrapedProxy) Source() string   { return s.source }
-func (s *stubScrapedProxy) Username() string { return "" }
-func (s *stubScrapedProxy) Password() string { return "" }
 
 type schedulerTestLogger struct{}
 
@@ -74,15 +21,41 @@ func TestScheduleScrapingUseCase_runCycle(t *testing.T) {
 	logger := schedulerTestLogger{}
 
 	t.Run("publishes scraped proxies", func(t *testing.T) {
-		proxies := []scraper.ScrapedProxy{
-			&stubScrapedProxy{ip: "1.1.1.1", port: 8080, protocol: "http", source: "test"},
-			&stubScrapedProxy{ip: "2.2.2.2", port: 3128, protocol: "socks5", source: "test"},
-		}
+		proxy1 := mocks.NewScrapedProxy(t)
+		proxy1.EXPECT().IP().Return("1.1.1.1").Maybe()
+		proxy1.EXPECT().Port().Return(8080).Maybe()
+		proxy1.EXPECT().Protocol().Return("http").Maybe()
+		proxy1.EXPECT().Source().Return("test").Maybe()
+		proxy1.EXPECT().Username().Return("").Maybe()
+		proxy1.EXPECT().Password().Return("").Maybe()
 
-		scraperMock := &mockProxyScraper{proxies: proxies}
-		publisher := &mockPublisher{}
-		serializer := &mockSerializer{}
-		cleaner := &mockCleaner{}
+		proxy2 := mocks.NewScrapedProxy(t)
+		proxy2.EXPECT().IP().Return("2.2.2.2").Maybe()
+		proxy2.EXPECT().Port().Return(3128).Maybe()
+		proxy2.EXPECT().Protocol().Return("socks5").Maybe()
+		proxy2.EXPECT().Source().Return("test").Maybe()
+		proxy2.EXPECT().Username().Return("").Maybe()
+		proxy2.EXPECT().Password().Return("").Maybe()
+
+		scraperMock := mocks.NewProxyScraper(t)
+		scraperMock.EXPECT().
+			Execute(mock.Anything).
+			Return([]scraper.ScrapedProxy{proxy1, proxy2}, []error{})
+
+		publisher := mocks.NewPublisher(t)
+		publisher.EXPECT().
+			Publish(mock.Anything, "test-topic", mock.Anything).
+			Return(nil).Times(2)
+
+		serializer := mocks.NewProxySerializer(t)
+		serializer.EXPECT().
+			Serialize(mock.Anything).
+			Return([]byte("serialized"), nil).Times(2)
+
+		cleaner := mocks.NewCleaner(t)
+		cleaner.EXPECT().
+			Cleanup(mock.Anything).
+			Return(nil)
 
 		uc := scraper.NewScheduleScrapingUseCase(scraperMock, serializer, publisher, cleaner, time.Hour, logger, "test-topic")
 
@@ -90,18 +63,21 @@ func TestScheduleScrapingUseCase_runCycle(t *testing.T) {
 		defer cancel()
 
 		_ = uc.Execute(ctx)
-
-		assert.Len(t, publisher.published, 2)
 	})
 
 	t.Run("handles scraper errors gracefully", func(t *testing.T) {
-		scraperMock := &mockProxyScraper{
-			proxies: []scraper.ScrapedProxy{},
-			errs:    []error{errors.New("fetch failed")},
-		}
-		publisher := &mockPublisher{}
-		serializer := &mockSerializer{}
-		cleaner := &mockCleaner{}
+		scraperMock := mocks.NewProxyScraper(t)
+		scraperMock.EXPECT().
+			Execute(mock.Anything).
+			Return([]scraper.ScrapedProxy{}, []error{errors.New("fetch failed")})
+
+		publisher := mocks.NewPublisher(t)
+		serializer := mocks.NewProxySerializer(t)
+
+		cleaner := mocks.NewCleaner(t)
+		cleaner.EXPECT().
+			Cleanup(mock.Anything).
+			Return(nil)
 
 		uc := scraper.NewScheduleScrapingUseCase(scraperMock, serializer, publisher, cleaner, time.Hour, logger, "test-topic")
 
@@ -111,18 +87,36 @@ func TestScheduleScrapingUseCase_runCycle(t *testing.T) {
 		err := uc.Execute(ctx)
 
 		assert.ErrorIs(t, err, context.DeadlineExceeded)
-		assert.Empty(t, publisher.published)
 	})
 
 	t.Run("handles publish errors gracefully", func(t *testing.T) {
-		proxies := []scraper.ScrapedProxy{
-			&stubScrapedProxy{ip: "1.1.1.1", port: 8080, protocol: "http", source: "test"},
-		}
+		proxy1 := mocks.NewScrapedProxy(t)
+		proxy1.EXPECT().IP().Return("1.1.1.1").Maybe()
+		proxy1.EXPECT().Port().Return(8080).Maybe()
+		proxy1.EXPECT().Protocol().Return("http").Maybe()
+		proxy1.EXPECT().Source().Return("test").Maybe()
+		proxy1.EXPECT().Username().Return("").Maybe()
+		proxy1.EXPECT().Password().Return("").Maybe()
 
-		scraperMock := &mockProxyScraper{proxies: proxies}
-		publisher := &mockPublisher{err: errors.New("redis unavailable")}
-		serializer := &mockSerializer{}
-		cleaner := &mockCleaner{}
+		scraperMock := mocks.NewProxyScraper(t)
+		scraperMock.EXPECT().
+			Execute(mock.Anything).
+			Return([]scraper.ScrapedProxy{proxy1}, []error{})
+
+		publisher := mocks.NewPublisher(t)
+		publisher.EXPECT().
+			Publish(mock.Anything, "test-topic", mock.Anything).
+			Return(errors.New("redis unavailable"))
+
+		serializer := mocks.NewProxySerializer(t)
+		serializer.EXPECT().
+			Serialize(mock.Anything).
+			Return([]byte("serialized"), nil)
+
+		cleaner := mocks.NewCleaner(t)
+		cleaner.EXPECT().
+			Cleanup(mock.Anything).
+			Return(nil)
 
 		uc := scraper.NewScheduleScrapingUseCase(scraperMock, serializer, publisher, cleaner, time.Hour, logger, "test-topic")
 
@@ -130,19 +124,32 @@ func TestScheduleScrapingUseCase_runCycle(t *testing.T) {
 		defer cancel()
 
 		_ = uc.Execute(ctx)
-
-		assert.Empty(t, publisher.published)
 	})
 
 	t.Run("handles serializer errors gracefully", func(t *testing.T) {
-		proxies := []scraper.ScrapedProxy{
-			&stubScrapedProxy{ip: "1.1.1.1", port: 8080, protocol: "http", source: "test"},
-		}
+		proxy1 := mocks.NewScrapedProxy(t)
+		proxy1.EXPECT().IP().Return("1.1.1.1").Maybe()
+		proxy1.EXPECT().Port().Return(8080).Maybe()
+		proxy1.EXPECT().Protocol().Return("http").Maybe()
+		proxy1.EXPECT().Source().Return("test").Maybe()
+		proxy1.EXPECT().Username().Return("").Maybe()
+		proxy1.EXPECT().Password().Return("").Maybe()
 
-		scraperMock := &mockProxyScraper{proxies: proxies}
-		publisher := &mockPublisher{}
-		serializer := &mockSerializer{err: errors.New("marshal failed")}
-		cleaner := &mockCleaner{}
+		scraperMock := mocks.NewProxyScraper(t)
+		scraperMock.EXPECT().
+			Execute(mock.Anything).
+			Return([]scraper.ScrapedProxy{proxy1}, []error{})
+
+		publisher := mocks.NewPublisher(t)
+		serializer := mocks.NewProxySerializer(t)
+		serializer.EXPECT().
+			Serialize(mock.Anything).
+			Return(nil, errors.New("marshal failed"))
+
+		cleaner := mocks.NewCleaner(t)
+		cleaner.EXPECT().
+			Cleanup(mock.Anything).
+			Return(nil)
 
 		uc := scraper.NewScheduleScrapingUseCase(scraperMock, serializer, publisher, cleaner, time.Hour, logger, "test-topic")
 
@@ -150,7 +157,5 @@ func TestScheduleScrapingUseCase_runCycle(t *testing.T) {
 		defer cancel()
 
 		_ = uc.Execute(ctx)
-
-		assert.Empty(t, publisher.published)
 	})
 }

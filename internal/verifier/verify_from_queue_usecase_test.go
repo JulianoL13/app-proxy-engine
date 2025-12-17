@@ -8,69 +8,10 @@ import (
 	"time"
 
 	"github.com/JulianoL13/app-proxy-engine/internal/verifier"
+	"github.com/JulianoL13/app-proxy-engine/internal/verifier/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
-
-type mockConsumer struct {
-	messages chan verifier.Message
-	acked    []string
-	err      error
-}
-
-func (m *mockConsumer) Subscribe(ctx context.Context, topic, group, consumer string) (<-chan verifier.Message, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	return m.messages, nil
-}
-
-func (m *mockConsumer) Ack(ctx context.Context, topic, group, msgID string) error {
-	m.acked = append(m.acked, msgID)
-	return nil
-}
-
-type mockChecker struct {
-	output verifier.VerifyOutput
-}
-
-func (m *mockChecker) Verify(ctx context.Context, p verifier.Verifiable) verifier.VerifyOutput {
-	return m.output
-}
-
-type mockDeserializer struct {
-	proxy verifier.VerifiedProxy
-	err   error
-}
-
-func (m *mockDeserializer) Deserialize(payload []byte) (verifier.VerifiedProxy, error) {
-	return m.proxy, m.err
-}
-
-type mockWriter struct {
-	saved []verifier.VerifiedProxy
-	err   error
-}
-
-func (m *mockWriter) Save(ctx context.Context, p verifier.VerifiedProxy) error {
-	if m.err != nil {
-		return m.err
-	}
-	m.saved = append(m.saved, p)
-	return nil
-}
-
-type stubProxy struct {
-	address   string
-	latency   time.Duration
-	anonymity string
-}
-
-func (s *stubProxy) Address() string { return s.address }
-func (s *stubProxy) URL() *url.URL   { return nil }
-func (s *stubProxy) MarkSuccess(latency time.Duration, anonymity string) {
-	s.latency = latency
-	s.anonymity = anonymity
-}
 
 type verifierTestLogger struct{}
 
@@ -78,41 +19,59 @@ func (l verifierTestLogger) Info(msg string, args ...any)  {}
 func (l verifierTestLogger) Warn(msg string, args ...any)  {}
 func (l verifierTestLogger) Debug(msg string, args ...any) {}
 
-type mockWorkerPool struct{}
-
-func (m *mockWorkerPool) Submit(ctx context.Context, job func(ctx context.Context)) error {
-	job(ctx)
-	return nil
-}
-
 func TestVerifyFromQueueUseCase_Execute(t *testing.T) {
 	logger := verifierTestLogger{}
-	pool := &mockWorkerPool{}
 
 	t.Run("processes and saves successful proxy", func(t *testing.T) {
 		messages := make(chan verifier.Message, 1)
 		messages <- verifier.Message{ID: "msg-1", Payload: []byte(`{}`)}
 		close(messages)
 
-		proxy := &stubProxy{address: "1.1.1.1:8080"}
+		consumer := mocks.NewConsumer(t)
+		consumer.EXPECT().
+			Subscribe(mock.Anything, "test-topic", "test-group", "test-worker").
+			Return((<-chan verifier.Message)(messages), nil)
+		consumer.EXPECT().
+			Ack(mock.Anything, "test-topic", "test-group", "msg-1").
+			Return(nil)
 
-		consumer := &mockConsumer{messages: messages}
-		checker := &mockChecker{output: verifier.VerifyOutput{
-			Success:   true,
-			Latency:   100 * time.Millisecond,
-			Anonymity: "elite",
-		}}
-		deserializer := &mockDeserializer{proxy: proxy}
-		writer := &mockWriter{}
+		proxyMock := mocks.NewVerifiedProxy(t)
+		proxyMock.EXPECT().Address().Return("1.1.1.1:8080").Maybe()
+		proxyMock.EXPECT().URL().Return(&url.URL{}).Maybe()
+		proxyMock.EXPECT().MarkSuccess(100*time.Millisecond, "elite").Return().Maybe()
+
+		deserializer := mocks.NewProxyDeserializer(t)
+		deserializer.EXPECT().
+			Deserialize([]byte(`{}`)).
+			Return(proxyMock, nil)
+
+		checker := mocks.NewProxyChecker(t)
+		checker.EXPECT().
+			Verify(mock.Anything, proxyMock).
+			Return(verifier.VerifyOutput{
+				Success:   true,
+				Latency:   100 * time.Millisecond,
+				Anonymity: "elite",
+			})
+
+		writer := mocks.NewWriter(t)
+		writer.EXPECT().
+			Save(mock.Anything, proxyMock).
+			Return(nil)
+
+		pool := mocks.NewWorkerPool(t)
+		pool.EXPECT().
+			Submit(mock.Anything, mock.AnythingOfType("func(context.Context)")).
+			RunAndReturn(func(ctx context.Context, job func(context.Context)) error {
+				job(ctx)
+				return nil
+			})
 
 		uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, pool, "test-worker", "test-topic", "test-group")
 
 		err := uc.Execute(context.Background())
 
 		assert.NoError(t, err)
-		assert.Len(t, writer.saved, 1)
-		assert.Contains(t, consumer.acked, "msg-1")
-		assert.Equal(t, "elite", proxy.anonymity)
 	})
 
 	t.Run("acks but does not save failed proxy", func(t *testing.T) {
@@ -120,20 +79,43 @@ func TestVerifyFromQueueUseCase_Execute(t *testing.T) {
 		messages <- verifier.Message{ID: "msg-1", Payload: []byte(`{}`)}
 		close(messages)
 
-		proxy := &stubProxy{address: "1.1.1.1:8080"}
+		consumer := mocks.NewConsumer(t)
+		consumer.EXPECT().
+			Subscribe(mock.Anything, "test-topic", "test-group", "test-worker").
+			Return((<-chan verifier.Message)(messages), nil)
+		consumer.EXPECT().
+			Ack(mock.Anything, "test-topic", "test-group", "msg-1").
+			Return(nil)
 
-		consumer := &mockConsumer{messages: messages}
-		checker := &mockChecker{output: verifier.VerifyOutput{Success: false}}
-		deserializer := &mockDeserializer{proxy: proxy}
-		writer := &mockWriter{}
+		proxyMock := mocks.NewVerifiedProxy(t)
+		proxyMock.EXPECT().Address().Return("1.1.1.1:8080").Maybe()
+		proxyMock.EXPECT().URL().Return(&url.URL{}).Maybe()
+
+		deserializer := mocks.NewProxyDeserializer(t)
+		deserializer.EXPECT().
+			Deserialize([]byte(`{}`)).
+			Return(proxyMock, nil)
+
+		checker := mocks.NewProxyChecker(t)
+		checker.EXPECT().
+			Verify(mock.Anything, proxyMock).
+			Return(verifier.VerifyOutput{Success: false})
+
+		writer := mocks.NewWriter(t)
+
+		pool := mocks.NewWorkerPool(t)
+		pool.EXPECT().
+			Submit(mock.Anything, mock.AnythingOfType("func(context.Context)")).
+			RunAndReturn(func(ctx context.Context, job func(context.Context)) error {
+				job(ctx)
+				return nil
+			})
 
 		uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, pool, "test-worker", "test-topic", "test-group")
 
 		err := uc.Execute(context.Background())
 
 		assert.NoError(t, err)
-		assert.Empty(t, writer.saved)
-		assert.Contains(t, consumer.acked, "msg-1")
 	})
 
 	t.Run("handles deserialize error", func(t *testing.T) {
@@ -141,25 +123,47 @@ func TestVerifyFromQueueUseCase_Execute(t *testing.T) {
 		messages <- verifier.Message{ID: "msg-1", Payload: []byte(`invalid`)}
 		close(messages)
 
-		consumer := &mockConsumer{messages: messages}
-		checker := &mockChecker{}
-		deserializer := &mockDeserializer{err: errors.New("invalid json")}
-		writer := &mockWriter{}
+		consumer := mocks.NewConsumer(t)
+		consumer.EXPECT().
+			Subscribe(mock.Anything, "test-topic", "test-group", "test-worker").
+			Return((<-chan verifier.Message)(messages), nil)
+		consumer.EXPECT().
+			Ack(mock.Anything, "test-topic", "test-group", "msg-1").
+			Return(nil)
+
+		deserializer := mocks.NewProxyDeserializer(t)
+		deserializer.EXPECT().
+			Deserialize([]byte(`invalid`)).
+			Return(nil, errors.New("invalid json"))
+
+		checker := mocks.NewProxyChecker(t)
+		writer := mocks.NewWriter(t)
+
+		pool := mocks.NewWorkerPool(t)
+		pool.EXPECT().
+			Submit(mock.Anything, mock.AnythingOfType("func(context.Context)")).
+			RunAndReturn(func(ctx context.Context, job func(context.Context)) error {
+				job(ctx)
+				return nil
+			})
 
 		uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, pool, "test-worker", "test-topic", "test-group")
 
 		err := uc.Execute(context.Background())
 
 		assert.NoError(t, err)
-		assert.Empty(t, writer.saved)
-		assert.Contains(t, consumer.acked, "msg-1")
 	})
 
 	t.Run("handles subscribe error", func(t *testing.T) {
-		consumer := &mockConsumer{err: errors.New("redis connection failed")}
-		checker := &mockChecker{}
-		deserializer := &mockDeserializer{}
-		writer := &mockWriter{}
+		consumer := mocks.NewConsumer(t)
+		consumer.EXPECT().
+			Subscribe(mock.Anything, "test-topic", "test-group", "test-worker").
+			Return(nil, errors.New("redis connection failed"))
+
+		checker := mocks.NewProxyChecker(t)
+		deserializer := mocks.NewProxyDeserializer(t)
+		writer := mocks.NewWriter(t)
+		pool := mocks.NewWorkerPool(t)
 
 		uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, pool, "test-worker", "test-topic", "test-group")
 
@@ -174,18 +178,46 @@ func TestVerifyFromQueueUseCase_Execute(t *testing.T) {
 		messages <- verifier.Message{ID: "msg-1", Payload: []byte(`{}`)}
 		close(messages)
 
-		proxy := &stubProxy{address: "1.1.1.1:8080"}
+		consumer := mocks.NewConsumer(t)
+		consumer.EXPECT().
+			Subscribe(mock.Anything, "test-topic", "test-group", "test-worker").
+			Return((<-chan verifier.Message)(messages), nil)
+		consumer.EXPECT().
+			Ack(mock.Anything, "test-topic", "test-group", "msg-1").
+			Return(nil)
 
-		consumer := &mockConsumer{messages: messages}
-		checker := &mockChecker{output: verifier.VerifyOutput{Success: true}}
-		deserializer := &mockDeserializer{proxy: proxy}
-		writer := &mockWriter{err: errors.New("save failed")}
+		proxyMock := mocks.NewVerifiedProxy(t)
+		proxyMock.EXPECT().Address().Return("1.1.1.1:8080").Maybe()
+		proxyMock.EXPECT().URL().Return(&url.URL{}).Maybe()
+		proxyMock.EXPECT().MarkSuccess(mock.Anything, mock.Anything).Return().Maybe()
+
+		deserializer := mocks.NewProxyDeserializer(t)
+		deserializer.EXPECT().
+			Deserialize([]byte(`{}`)).
+			Return(proxyMock, nil)
+
+		checker := mocks.NewProxyChecker(t)
+		checker.EXPECT().
+			Verify(mock.Anything, proxyMock).
+			Return(verifier.VerifyOutput{Success: true})
+
+		writer := mocks.NewWriter(t)
+		writer.EXPECT().
+			Save(mock.Anything, proxyMock).
+			Return(errors.New("save failed"))
+
+		pool := mocks.NewWorkerPool(t)
+		pool.EXPECT().
+			Submit(mock.Anything, mock.AnythingOfType("func(context.Context)")).
+			RunAndReturn(func(ctx context.Context, job func(context.Context)) error {
+				job(ctx)
+				return nil
+			})
 
 		uc := verifier.NewVerifyFromQueueUseCase(consumer, checker, deserializer, writer, logger, pool, "test-worker", "test-topic", "test-group")
 
 		err := uc.Execute(context.Background())
 
 		assert.NoError(t, err)
-		assert.Contains(t, consumer.acked, "msg-1")
 	})
 }
