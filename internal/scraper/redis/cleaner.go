@@ -26,20 +26,16 @@ func NewCleaner(client *redis.Client, keyPrefix string) *Cleaner {
 func (c *Cleaner) Cleanup(ctx context.Context) error {
 	now := fmt.Sprintf("%f", float64(time.Now().Unix()))
 
-	baseKeys := []string{
-		fmt.Sprintf("%s:idx:alive", c.keyPrefix),
-		fmt.Sprintf("%s:idx:latency", c.keyPrefix),
-	}
-
 	pattern := fmt.Sprintf("%s:idx:*", c.keyPrefix)
+	var keys []string
 	var cursor uint64
 	for {
-		keys, nextCursor, err := c.client.Scan(ctx, cursor, pattern, 100).Result()
+		scanned, nextCursor, err := c.client.Scan(ctx, cursor, pattern, 100).Result()
 		if err != nil {
 			return fmt.Errorf("scan: %w", err)
 		}
 
-		baseKeys = append(baseKeys, keys...)
+		keys = append(keys, scanned...)
 		cursor = nextCursor
 		if cursor == 0 {
 			break
@@ -47,7 +43,7 @@ func (c *Cleaner) Cleanup(ctx context.Context) error {
 	}
 
 	pipe := c.client.Pipeline()
-	for _, key := range baseKeys {
+	for _, key := range keys {
 		pipe.ZRemRangeByScore(ctx, key, "-inf", now)
 	}
 
