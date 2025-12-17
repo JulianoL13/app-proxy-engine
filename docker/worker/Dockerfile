@@ -12,9 +12,19 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/bin/worker ./cmd/worker
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_TIME=unknown
+
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -ldflags="-w -s -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.buildTime=${BUILD_TIME}" \
+    -o /app/bin/worker ./cmd/worker
 
 FROM scratch
+
+LABEL org.opencontainers.image.source="https://github.com/JulianoL13/app-proxy-engine"
+LABEL org.opencontainers.image.description="Proxy Engine Worker"
+LABEL org.opencontainers.image.licenses="MIT"
 
 COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
