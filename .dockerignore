@@ -1,28 +1,38 @@
-# Version Control
+# Git
 .git
 .gitignore
 
-# Environment Variables
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Documentation
+*.md
+!README.md
+
+# Environment
 .env
 .env.*
 
-# Temporary Files
-tmp/
-bin/
-*.log
-*.tmp
-.DS_Store
+# Docker
+docker-compose*.yml
+Dockerfile
 
-# IDEs
-.idea/
-.vscode/
+# Build artifacts
+build/
+coverage.out
+coverage.html
 
-# Documentation & Configs not needed in build
-docker-compose.yml
-docker-compose.dev.yml
-README.md
-task.md
-code_comparison.md
-implementation_plan.md
-walkthrough.md
-*.md
+# Test files
+*_test.go
+**/*_test.go
+**/mocks/
+
+# Config files not needed at runtime
+config/mockery/
+.air.toml
+
+# Artifacts
+.gemini/
