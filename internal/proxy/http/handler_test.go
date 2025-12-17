@@ -8,10 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JulianoL13/app-proxy-engine/internal/proxy"
-	proxyhttp "github.com/JulianoL13/app-proxy-engine/internal/proxy/http"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/JulianoL13/app-proxy-engine/internal/proxy"
+	proxyhttp "github.com/JulianoL13/app-proxy-engine/internal/proxy/http"
 )
 
 type testLogger struct{}
@@ -129,7 +130,7 @@ func TestHandler_GetProxies(t *testing.T) {
 		router.ServeHTTP(rec, req)
 
 		var result proxyhttp.PaginatedResponse
-		json.Unmarshal(rec.Body.Bytes(), &result)
+		_ = json.Unmarshal(rec.Body.Bytes(), &result)
 
 		assert.Len(t, result.Data, 1)
 		assert.Equal(t, "http", result.Data[0].Protocol)
@@ -150,7 +151,7 @@ func TestHandler_GetProxies(t *testing.T) {
 		router.ServeHTTP(rec, req)
 
 		var result proxyhttp.PaginatedResponse
-		json.Unmarshal(rec.Body.Bytes(), &result)
+		_ = json.Unmarshal(rec.Body.Bytes(), &result)
 
 		assert.Len(t, result.Data, 1)
 		assert.Equal(t, "elite", result.Data[0].Anonymity)
@@ -171,7 +172,7 @@ func TestHandler_GetProxies(t *testing.T) {
 		router.ServeHTTP(rec, req)
 
 		var result proxyhttp.PaginatedResponse
-		json.Unmarshal(rec.Body.Bytes(), &result)
+		_ = json.Unmarshal(rec.Body.Bytes(), &result)
 
 		assert.Len(t, result.Data, 1)
 		assert.Equal(t, int64(100), result.Data[0].Latency)

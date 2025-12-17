@@ -12,12 +12,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/joho/godotenv"
+	"github.com/redis/go-redis/v9"
+
 	"github.com/JulianoL13/app-proxy-engine/internal/common/logs/slog"
 	"github.com/JulianoL13/app-proxy-engine/internal/proxy"
 	proxyhttp "github.com/JulianoL13/app-proxy-engine/internal/proxy/http"
 	proxyredis "github.com/JulianoL13/app-proxy-engine/internal/proxy/redis"
-	"github.com/joho/godotenv"
-	"github.com/redis/go-redis/v9"
 )
 
 type loggerAdapter struct {

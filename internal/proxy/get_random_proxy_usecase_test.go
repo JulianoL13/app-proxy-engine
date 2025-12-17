@@ -6,11 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JulianoL13/app-proxy-engine/internal/proxy"
-	"github.com/JulianoL13/app-proxy-engine/internal/proxy/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/JulianoL13/app-proxy-engine/internal/proxy"
+	"github.com/JulianoL13/app-proxy-engine/internal/proxy/mocks"
 )
 
 type getRandomTestLogger struct{}

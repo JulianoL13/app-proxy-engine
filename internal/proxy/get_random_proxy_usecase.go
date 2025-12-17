@@ -2,8 +2,9 @@ package proxy
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
-	"math/rand"
+	"math/big"
 	"time"
 )
 
@@ -44,7 +45,11 @@ func (uc *GetRandomProxyUseCase) Execute(ctx context.Context, input GetRandomPro
 		return nil, ErrNoProxiesAvailable
 	}
 
-	selected := proxies[rand.Intn(len(proxies))]
+	n, err := rand.Int(rand.Reader, big.NewInt(int64(len(proxies))))
+	if err != nil {
+		return nil, err
+	}
+	selected := proxies[n.Int64()]
 	uc.logger.Debug("selected random proxy", "address", selected.Address())
 
 	return selected, nil

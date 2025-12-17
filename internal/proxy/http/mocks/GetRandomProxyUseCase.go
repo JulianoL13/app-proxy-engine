@@ -5,8 +5,9 @@ package mocks
 import (
 	context "context"
 
-	http "github.com/JulianoL13/app-proxy-engine/internal/proxy/http"
 	mock "github.com/stretchr/testify/mock"
+
+	http "github.com/JulianoL13/app-proxy-engine/internal/proxy/http"
 
 	proxy "github.com/JulianoL13/app-proxy-engine/internal/proxy"
 )

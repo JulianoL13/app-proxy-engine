@@ -11,6 +11,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/joho/godotenv"
+	"github.com/redis/go-redis/v9"
+
 	"github.com/JulianoL13/app-proxy-engine/internal/common/events"
 	"github.com/JulianoL13/app-proxy-engine/internal/common/logs/slog"
 	queueredis "github.com/JulianoL13/app-proxy-engine/internal/common/queue/redis"
@@ -19,8 +22,6 @@ import (
 	proxyredis "github.com/JulianoL13/app-proxy-engine/internal/proxy/redis"
 	"github.com/JulianoL13/app-proxy-engine/internal/verifier"
 	httpverifier "github.com/JulianoL13/app-proxy-engine/internal/verifier/http"
-	"github.com/joho/godotenv"
-	"github.com/redis/go-redis/v9"
 )
 
 type consumerAdapter struct {

@@ -5,12 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JulianoL13/app-proxy-engine/internal/proxy"
-	proxyredis "github.com/JulianoL13/app-proxy-engine/internal/proxy/redis"
 	goredis "github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go/modules/redis"
+
+	"github.com/JulianoL13/app-proxy-engine/internal/proxy"
+	proxyredis "github.com/JulianoL13/app-proxy-engine/internal/proxy/redis"
 )
 
 func TestRepository_Save(t *testing.T) {
@@ -22,7 +23,7 @@ func TestRepository_Save(t *testing.T) {
 
 	redisContainer, err := redis.Run(ctx, "redis:7-alpine")
 	require.NoError(t, err)
-	defer redisContainer.Terminate(ctx)
+	defer func() { _ = redisContainer.Terminate(ctx) }()
 
 	endpoint, err := redisContainer.Endpoint(ctx, "")
 	require.NoError(t, err)
@@ -113,7 +114,7 @@ func TestRepository_Save_Anonymity(t *testing.T) {
 
 	redisContainer, err := redis.Run(ctx, "redis:7-alpine")
 	require.NoError(t, err)
-	defer redisContainer.Terminate(ctx)
+	defer func() { _ = redisContainer.Terminate(ctx) }()
 
 	endpoint, err := redisContainer.Endpoint(ctx, "")
 	require.NoError(t, err)
@@ -166,7 +167,7 @@ func TestRepository_GetAlive(t *testing.T) {
 
 	redisContainer, err := redis.Run(ctx, "redis:7-alpine")
 	require.NoError(t, err)
-	defer redisContainer.Terminate(ctx)
+	defer func() { _ = redisContainer.Terminate(ctx) }()
 
 	endpoint, err := redisContainer.Endpoint(ctx, "")
 	require.NoError(t, err)
@@ -178,15 +179,15 @@ func TestRepository_GetAlive(t *testing.T) {
 
 	p1 := proxy.NewProxy("1.1.1.1", 80, proxy.HTTP, "s1")
 	p1.MarkSuccess(100*time.Millisecond, proxy.Elite)
-	repo.Save(ctx, p1)
+	require.NoError(t, repo.Save(ctx, p1))
 
 	p2 := proxy.NewProxy("2.2.2.2", 1080, proxy.SOCKS5, "s1")
 	p2.MarkSuccess(50*time.Millisecond, proxy.Anonymous)
-	repo.Save(ctx, p2)
+	require.NoError(t, repo.Save(ctx, p2))
 
 	p3 := proxy.NewProxy("3.3.3.3", 8080, proxy.HTTP, "s1")
 	p3.MarkSuccess(200*time.Millisecond, proxy.Transparent)
-	repo.Save(ctx, p3)
+	require.NoError(t, repo.Save(ctx, p3))
 
 	t.Run("returns all alive proxies without filter", func(t *testing.T) {
 		proxies, _, total, err := repo.GetAlive(ctx, 0, 10, proxy.FilterOptions{})

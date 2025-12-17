@@ -42,7 +42,7 @@ test-integration:
 # Format code and fix imports
 fmt:
 	go fmt ./...
-	goimports -w .
+	goimports -w -local github.com/JulianoL13/app-proxy-engine .
 
 # Run go vet
 vet:

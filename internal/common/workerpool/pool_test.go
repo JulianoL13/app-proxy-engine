@@ -7,9 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JulianoL13/app-proxy-engine/internal/common/workerpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/JulianoL13/app-proxy-engine/internal/common/workerpool"
 )
 
 func TestPool_New(t *testing.T) {

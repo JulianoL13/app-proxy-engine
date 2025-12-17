@@ -5,11 +5,12 @@ import (
 	"testing"
 	"time"
 
-	queueredis "github.com/JulianoL13/app-proxy-engine/internal/common/queue/redis"
 	goredis "github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go/modules/redis"
+
+	queueredis "github.com/JulianoL13/app-proxy-engine/internal/common/queue/redis"
 )
 
 func TestStreamsClient_Publish(t *testing.T) {
@@ -21,7 +22,7 @@ func TestStreamsClient_Publish(t *testing.T) {
 
 	redisContainer, err := redis.Run(ctx, "redis:7-alpine")
 	require.NoError(t, err)
-	defer redisContainer.Terminate(ctx)
+	defer func() { _ = redisContainer.Terminate(ctx) }()
 
 	endpoint, err := redisContainer.Endpoint(ctx, "")
 	require.NoError(t, err)
@@ -50,7 +51,7 @@ func TestStreamsClient_Subscribe(t *testing.T) {
 
 	redisContainer, err := redis.Run(ctx, "redis:7-alpine")
 	require.NoError(t, err)
-	defer redisContainer.Terminate(ctx)
+	defer func() { _ = redisContainer.Terminate(ctx) }()
 
 	endpoint, err := redisContainer.Endpoint(ctx, "")
 	require.NoError(t, err)

@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/JulianoL13/app-proxy-engine/internal/proxy"
 	"github.com/redis/go-redis/v9"
+
+	"github.com/JulianoL13/app-proxy-engine/internal/proxy"
 )
 
 const (

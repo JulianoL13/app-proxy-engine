@@ -6,10 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JulianoL13/app-proxy-engine/internal/scraper"
-	"github.com/JulianoL13/app-proxy-engine/internal/scraper/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+
+	"github.com/JulianoL13/app-proxy-engine/internal/scraper"
+	"github.com/JulianoL13/app-proxy-engine/internal/scraper/mocks"
 )
 
 type schedulerTestLogger struct{}

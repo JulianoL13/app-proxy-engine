@@ -111,7 +111,9 @@ func (uc *VerifyFromQueueUseCase) Execute(ctx context.Context) error {
 			p, err := uc.deserializer.Deserialize(m.Payload)
 			if err != nil {
 				uc.logger.Warn("failed to deserialize proxy", "error", err, "msgID", m.ID)
-				uc.consumer.Ack(ctx, uc.topic, uc.group, m.ID)
+				if err := uc.consumer.Ack(ctx, uc.topic, uc.group, m.ID); err != nil {
+					uc.logger.Warn("failed to ack message", "msgID", m.ID, "error", err)
+				}
 				return
 			}
 
@@ -128,7 +130,9 @@ func (uc *VerifyFromQueueUseCase) Execute(ctx context.Context) error {
 				}
 			}
 
-			uc.consumer.Ack(ctx, uc.topic, uc.group, m.ID)
+			if err := uc.consumer.Ack(ctx, uc.topic, uc.group, m.ID); err != nil {
+				uc.logger.Warn("failed to ack message", "msgID", m.ID, "error", err)
+			}
 
 			if current%100 == 0 {
 				uc.logger.Info("progress", "processed", current, "alive", alive.Load())

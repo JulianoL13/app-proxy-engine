@@ -7,10 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JulianoL13/app-proxy-engine/internal/verifier"
-	"github.com/JulianoL13/app-proxy-engine/internal/verifier/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+
+	"github.com/JulianoL13/app-proxy-engine/internal/verifier"
+	"github.com/JulianoL13/app-proxy-engine/internal/verifier/mocks"
 )
 
 type verifierTestLogger struct{}

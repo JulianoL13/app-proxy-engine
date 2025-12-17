@@ -36,13 +36,13 @@ type ErrorResponse struct {
 func writeValidationError(w http.ResponseWriter, errs []FieldError) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusBadRequest)
-	json.NewEncoder(w).Encode(ValidationError{Errors: errs})
+	_ = json.NewEncoder(w).Encode(ValidationError{Errors: errs})
 }
 
 func writeError(w http.ResponseWriter, status int, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(ErrorResponse{Error: message})
+	_ = json.NewEncoder(w).Encode(ErrorResponse{Error: message})
 }
 
 type GetProxiesInput struct {
@@ -221,7 +221,7 @@ func parseFilters(r *http.Request) (protocol, anonymity string, maxLatency time.
 
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
 func (h *Handler) GetProxies(w http.ResponseWriter, r *http.Request) {
@@ -266,7 +266,7 @@ func (h *Handler) GetProxies(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 func (h *Handler) GetRandomProxy(w http.ResponseWriter, r *http.Request) {
@@ -294,5 +294,5 @@ func (h *Handler) GetRandomProxy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(toResponse(p))
+	_ = json.NewEncoder(w).Encode(toResponse(p))
 }

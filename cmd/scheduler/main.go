@@ -10,14 +10,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/joho/godotenv"
+	"github.com/redis/go-redis/v9"
+
 	"github.com/JulianoL13/app-proxy-engine/internal/common/events"
 	"github.com/JulianoL13/app-proxy-engine/internal/common/logs/slog"
 	queueredis "github.com/JulianoL13/app-proxy-engine/internal/common/queue/redis"
 	"github.com/JulianoL13/app-proxy-engine/internal/scraper"
 	httpclient "github.com/JulianoL13/app-proxy-engine/internal/scraper/http"
 	scraperredis "github.com/JulianoL13/app-proxy-engine/internal/scraper/redis"
-	"github.com/joho/godotenv"
-	"github.com/redis/go-redis/v9"
 )
 
 type scraperAdapter struct {
