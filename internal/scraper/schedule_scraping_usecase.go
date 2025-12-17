@@ -29,12 +29,15 @@ type ProxySerializer interface {
 	Serialize(p ScrapedProxy) ([]byte, error)
 }
 
-const DefaultTopicVerify = "proxies:verify"
+type Cleaner interface {
+	Cleanup(ctx context.Context) error
+}
 
 type ScheduleScrapingUseCase struct {
 	scraper    ProxyScraper
 	serializer ProxySerializer
 	publisher  Publisher
+	cleaner    Cleaner
 	interval   time.Duration
 	topic      string
 	logger     SchedulerLogger
@@ -44,17 +47,16 @@ func NewScheduleScrapingUseCase(
 	scraper ProxyScraper,
 	serializer ProxySerializer,
 	publisher Publisher,
+	cleaner Cleaner,
 	interval time.Duration,
 	logger SchedulerLogger,
 	topic string,
 ) *ScheduleScrapingUseCase {
-	if topic == "" {
-		topic = DefaultTopicVerify
-	}
 	return &ScheduleScrapingUseCase{
 		scraper:    scraper,
 		serializer: serializer,
 		publisher:  publisher,
+		cleaner:    cleaner,
 		interval:   interval,
 		topic:      topic,
 		logger:     logger,
@@ -104,4 +106,13 @@ func (uc *ScheduleScrapingUseCase) runCycle(ctx context.Context) {
 	}
 
 	uc.logger.Info("scrape cycle complete", "scraped", len(proxies), "published", published)
+
+	// Cleanup expired proxies from indexes
+	if uc.cleaner != nil {
+		if err := uc.cleaner.Cleanup(ctx); err != nil {
+			uc.logger.Warn("cleanup failed", "error", err)
+		} else {
+			uc.logger.Info("cleanup complete")
+		}
+	}
 }
