@@ -21,7 +21,7 @@ import (
 )
 
 type loggerAdapter struct {
-	inner *slog.Logger
+	inner slog.Logger
 }
 
 func (l *loggerAdapter) Debug(msg string, args ...any) { l.inner.Debug(msg, args...) }
