@@ -1,5 +1,8 @@
 # Proxy Engine
 
+> [Read in English](README_EN.md)
+
+
 Esse projeto surgiu de uma necessidade pessoal: tenho vários projetos de scraping em mente e já tive problemas com bloqueios de IP. Daí tive a ideia de criar uma ferramenta própria que agrega proxies gratuitos da internet.
 
 Aproveitei para implementar em **Go**, linguagem que estou estudando. Também tentei aplicar conceitos de **Clean Architecture** (mesmo sendo overkill para o escopo, eu sei disso), além de outros aprendizados.
