@@ -32,7 +32,7 @@ func TestRepository_Save(t *testing.T) {
 	})
 	defer client.Close()
 
-	repo := proxyredis.NewRepository(client, "test-prefix").WithTTL(5 * time.Minute)
+	repo := proxyredis.NewRepository(client, "test").WithTTL(5 * time.Minute)
 
 	t.Run("saves proxy to redis", func(t *testing.T) {
 		p := proxy.NewProxy("192.168.1.1", 8080, proxy.HTTP, "test-source")
@@ -41,14 +41,14 @@ func TestRepository_Save(t *testing.T) {
 		err := repo.Save(ctx, p)
 		assert.NoError(t, err)
 
-		exists, err := client.Exists(ctx, "test-prefix:data:192.168.1.1:8080").Result()
+		exists, err := client.Exists(ctx, "test:data:192.168.1.1:8080").Result()
 		assert.NoError(t, err)
 		assert.Equal(t, int64(1), exists)
 
-		_, err = client.ZScore(ctx, "test-prefix:alive", "192.168.1.1:8080").Result()
+		_, err = client.ZScore(ctx, "test:idx:alive", "192.168.1.1:8080").Result()
 		assert.NoError(t, err)
 
-		_, err = client.ZScore(ctx, "test-prefix:protocol:http", "192.168.1.1:8080").Result()
+		_, err = client.ZScore(ctx, "test:idx:proto:http", "192.168.1.1:8080").Result()
 		assert.NoError(t, err)
 	})
 
@@ -59,11 +59,34 @@ func TestRepository_Save(t *testing.T) {
 		err := repo.Save(ctx, p)
 		assert.NoError(t, err)
 
-		_, err = client.ZScore(ctx, "test-prefix:protocol:socks5", "10.0.0.1:1080").Result()
+		_, err = client.ZScore(ctx, "test:idx:proto:socks5", "10.0.0.1:1080").Result()
 		assert.NoError(t, err)
 
-		_, err = client.ZScore(ctx, "test-prefix:protocol:http", "10.0.0.1:1080").Result()
+		_, err = client.ZScore(ctx, "test:idx:proto:http", "10.0.0.1:1080").Result()
 		assert.Error(t, err)
+	})
+
+	t.Run("saves composite index", func(t *testing.T) {
+		p := proxy.NewProxy("10.0.0.2", 8080, proxy.HTTP, "source")
+		p.MarkSuccess(100*time.Millisecond, proxy.Elite)
+
+		err := repo.Save(ctx, p)
+		assert.NoError(t, err)
+
+		_, err = client.ZScore(ctx, "test:idx:proto:http:anon:elite", "10.0.0.2:8080").Result()
+		assert.NoError(t, err)
+	})
+
+	t.Run("saves latency index", func(t *testing.T) {
+		p := proxy.NewProxy("10.0.0.3", 8080, proxy.HTTP, "source")
+		p.MarkSuccess(150*time.Millisecond, proxy.Elite)
+
+		err := repo.Save(ctx, p)
+		assert.NoError(t, err)
+
+		score, err := client.ZScore(ctx, "test:idx:latency", "10.0.0.3:8080").Result()
+		assert.NoError(t, err)
+		assert.Equal(t, float64(150), score)
 	})
 
 	t.Run("overwrites existing proxy", func(t *testing.T) {
@@ -76,7 +99,7 @@ func TestRepository_Save(t *testing.T) {
 		err = repo.Save(ctx, p2)
 		assert.NoError(t, err)
 
-		_, err = client.ZScore(ctx, "test-prefix:alive", "192.168.2.2:3128").Result()
+		_, err = client.ZScore(ctx, "test:idx:alive", "192.168.2.2:3128").Result()
 		assert.NoError(t, err)
 	})
 }
@@ -98,7 +121,7 @@ func TestRepository_Save_Anonymity(t *testing.T) {
 	client := goredis.NewClient(&goredis.Options{Addr: endpoint})
 	defer client.Close()
 
-	repo := proxyredis.NewRepository(client, "test-prefix")
+	repo := proxyredis.NewRepository(client, "test")
 
 	t.Run("saves anonymity index", func(t *testing.T) {
 		p := proxy.NewProxy("10.0.0.2", 8080, proxy.HTTP, "test")
@@ -107,7 +130,7 @@ func TestRepository_Save_Anonymity(t *testing.T) {
 		err := repo.Save(ctx, p)
 		assert.NoError(t, err)
 
-		_, err = client.ZScore(ctx, "test-prefix:anonymity:transparent", "10.0.0.2:8080").Result()
+		_, err = client.ZScore(ctx, "test:idx:anon:transparent", "10.0.0.2:8080").Result()
 		assert.NoError(t, err)
 	})
 }
@@ -125,7 +148,7 @@ func TestRepository_Save_ConnectionError(t *testing.T) {
 	})
 	defer client.Close()
 
-	repo := proxyredis.NewRepository(client, "test-prefix")
+	repo := proxyredis.NewRepository(client, "test")
 
 	p := proxy.NewProxy("1.1.1.1", 8080, proxy.HTTP, "test")
 	err := repo.Save(ctx, p)
@@ -133,6 +156,7 @@ func TestRepository_Save_ConnectionError(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "save proxy")
 }
+
 func TestRepository_GetAlive(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
@@ -150,7 +174,7 @@ func TestRepository_GetAlive(t *testing.T) {
 	client := goredis.NewClient(&goredis.Options{Addr: endpoint})
 	defer client.Close()
 
-	repo := proxyredis.NewRepository(client, "test-prefix")
+	repo := proxyredis.NewRepository(client, "test")
 
 	p1 := proxy.NewProxy("1.1.1.1", 80, proxy.HTTP, "s1")
 	p1.MarkSuccess(100*time.Millisecond, proxy.Elite)
@@ -187,14 +211,28 @@ func TestRepository_GetAlive(t *testing.T) {
 		assert.Equal(t, "1.1.1.1:80", proxies[0].Address())
 	})
 
-	t.Run("filters by protocol and anonymity", func(t *testing.T) {
+	t.Run("filters by protocol and anonymity using composite index", func(t *testing.T) {
 		proxies, _, total, err := repo.GetAlive(ctx, 0, 10, proxy.FilterOptions{
 			Protocol:  "http",
 			Anonymity: "transparent",
 		})
 		assert.NoError(t, err)
-		assert.Equal(t, 2, total)
-		assert.Equal(t, 1, len(proxies))
+		assert.Equal(t, 1, total)
+		assert.Len(t, proxies, 1)
 		assert.Equal(t, "3.3.3.3:8080", proxies[0].Address())
+	})
+
+	t.Run("filters by max latency", func(t *testing.T) {
+		proxies, _, _, err := repo.GetAlive(ctx, 0, 10, proxy.FilterOptions{
+			MaxLatency: 100 * time.Millisecond,
+		})
+		assert.NoError(t, err)
+		assert.Len(t, proxies, 2)
+	})
+
+	t.Run("returns next cursor for pagination", func(t *testing.T) {
+		_, nextCursor, _, err := repo.GetAlive(ctx, 0, 2, proxy.FilterOptions{})
+		assert.NoError(t, err)
+		assert.Greater(t, nextCursor, float64(0))
 	})
 }
