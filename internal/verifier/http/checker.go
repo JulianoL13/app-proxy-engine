@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/JulianoL13/app-proxy-engine/internal/verifier"
@@ -18,26 +19,31 @@ type Logger interface {
 	Debug(msg string, args ...any)
 }
 
-const DefaultVerifyURL = "https://httpbin.org/ip"
+const DefaultVerifyURL = "https://httpbin.org/get"
 
 type Checker struct {
 	TargetURL string
 	Timeout   time.Duration
 	logger    Logger
 	realIP    string
+	initOnce  sync.Once
 }
 
 func NewChecker(target string, timeout time.Duration, logger Logger) *Checker {
 	if target == "" {
 		target = DefaultVerifyURL
 	}
-	c := &Checker{
+	return &Checker{
 		TargetURL: target,
 		Timeout:   timeout,
 		logger:    logger,
 	}
-	c.realIP = c.fetchRealIP()
-	return c
+}
+
+func (c *Checker) ensureRealIP() {
+	c.initOnce.Do(func() {
+		c.realIP = c.fetchRealIP()
+	})
 }
 
 func (c *Checker) fetchRealIP() string {
@@ -70,6 +76,8 @@ func (c *Checker) fetchRealIP() string {
 }
 
 func (c *Checker) Verify(ctx context.Context, p verifier.Verifiable) verifier.VerifyOutput {
+	c.ensureRealIP()
+
 	proxyURL := p.URL()
 
 	transport := &http.Transport{
@@ -148,12 +156,13 @@ func (c *Checker) Verify(ctx context.Context, p verifier.Verifiable) verifier.Ve
 	}
 }
 
-type headersResponse struct {
+type httpbinResponse struct {
 	Headers map[string]string `json:"headers"`
+	Origin  string            `json:"origin"`
 }
 
 func (c *Checker) detectAnonymity(body []byte) string {
-	var resp headersResponse
+	var resp httpbinResponse
 	if err := json.Unmarshal(body, &resp); err != nil {
 		return "unknown"
 	}
