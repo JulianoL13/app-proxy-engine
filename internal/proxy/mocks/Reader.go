@@ -22,9 +22,9 @@ func (_m *Reader) EXPECT() *Reader_Expecter {
 	return &Reader_Expecter{mock: &_m.Mock}
 }
 
-// GetAlive provides a mock function with given fields: ctx, cursor, limit
-func (_m *Reader) GetAlive(ctx context.Context, cursor float64, limit int) ([]*proxy.Proxy, float64, int, error) {
-	ret := _m.Called(ctx, cursor, limit)
+// GetAlive provides a mock function with given fields: ctx, cursor, limit, filter
+func (_m *Reader) GetAlive(ctx context.Context, cursor float64, limit int, filter proxy.FilterOptions) ([]*proxy.Proxy, float64, int, error) {
+	ret := _m.Called(ctx, cursor, limit, filter)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAlive")
@@ -34,31 +34,31 @@ func (_m *Reader) GetAlive(ctx context.Context, cursor float64, limit int) ([]*p
 	var r1 float64
 	var r2 int
 	var r3 error
-	if rf, ok := ret.Get(0).(func(context.Context, float64, int) ([]*proxy.Proxy, float64, int, error)); ok {
-		return rf(ctx, cursor, limit)
+	if rf, ok := ret.Get(0).(func(context.Context, float64, int, proxy.FilterOptions) ([]*proxy.Proxy, float64, int, error)); ok {
+		return rf(ctx, cursor, limit, filter)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, float64, int) []*proxy.Proxy); ok {
-		r0 = rf(ctx, cursor, limit)
+	if rf, ok := ret.Get(0).(func(context.Context, float64, int, proxy.FilterOptions) []*proxy.Proxy); ok {
+		r0 = rf(ctx, cursor, limit, filter)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*proxy.Proxy)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, float64, int) float64); ok {
-		r1 = rf(ctx, cursor, limit)
+	if rf, ok := ret.Get(1).(func(context.Context, float64, int, proxy.FilterOptions) float64); ok {
+		r1 = rf(ctx, cursor, limit, filter)
 	} else {
 		r1 = ret.Get(1).(float64)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, float64, int) int); ok {
-		r2 = rf(ctx, cursor, limit)
+	if rf, ok := ret.Get(2).(func(context.Context, float64, int, proxy.FilterOptions) int); ok {
+		r2 = rf(ctx, cursor, limit, filter)
 	} else {
 		r2 = ret.Get(2).(int)
 	}
 
-	if rf, ok := ret.Get(3).(func(context.Context, float64, int) error); ok {
-		r3 = rf(ctx, cursor, limit)
+	if rf, ok := ret.Get(3).(func(context.Context, float64, int, proxy.FilterOptions) error); ok {
+		r3 = rf(ctx, cursor, limit, filter)
 	} else {
 		r3 = ret.Error(3)
 	}
@@ -75,13 +75,14 @@ type Reader_GetAlive_Call struct {
 //   - ctx context.Context
 //   - cursor float64
 //   - limit int
-func (_e *Reader_Expecter) GetAlive(ctx interface{}, cursor interface{}, limit interface{}) *Reader_GetAlive_Call {
-	return &Reader_GetAlive_Call{Call: _e.mock.On("GetAlive", ctx, cursor, limit)}
+//   - filter proxy.FilterOptions
+func (_e *Reader_Expecter) GetAlive(ctx interface{}, cursor interface{}, limit interface{}, filter interface{}) *Reader_GetAlive_Call {
+	return &Reader_GetAlive_Call{Call: _e.mock.On("GetAlive", ctx, cursor, limit, filter)}
 }
 
-func (_c *Reader_GetAlive_Call) Run(run func(ctx context.Context, cursor float64, limit int)) *Reader_GetAlive_Call {
+func (_c *Reader_GetAlive_Call) Run(run func(ctx context.Context, cursor float64, limit int, filter proxy.FilterOptions)) *Reader_GetAlive_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(float64), args[2].(int))
+		run(args[0].(context.Context), args[1].(float64), args[2].(int), args[3].(proxy.FilterOptions))
 	})
 	return _c
 }
@@ -91,7 +92,7 @@ func (_c *Reader_GetAlive_Call) Return(_a0 []*proxy.Proxy, _a1 float64, _a2 int,
 	return _c
 }
 
-func (_c *Reader_GetAlive_Call) RunAndReturn(run func(context.Context, float64, int) ([]*proxy.Proxy, float64, int, error)) *Reader_GetAlive_Call {
+func (_c *Reader_GetAlive_Call) RunAndReturn(run func(context.Context, float64, int, proxy.FilterOptions) ([]*proxy.Proxy, float64, int, error)) *Reader_GetAlive_Call {
 	_c.Call.Return(run)
 	return _c
 }

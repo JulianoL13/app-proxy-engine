@@ -5,6 +5,7 @@ package mocks
 import (
 	context "context"
 
+	http "github.com/JulianoL13/app-proxy-engine/internal/proxy/http"
 	mock "github.com/stretchr/testify/mock"
 
 	proxy "github.com/JulianoL13/app-proxy-engine/internal/proxy"
@@ -23,9 +24,9 @@ func (_m *GetRandomProxyUseCase) EXPECT() *GetRandomProxyUseCase_Expecter {
 	return &GetRandomProxyUseCase_Expecter{mock: &_m.Mock}
 }
 
-// Execute provides a mock function with given fields: ctx
-func (_m *GetRandomProxyUseCase) Execute(ctx context.Context) (*proxy.Proxy, error) {
-	ret := _m.Called(ctx)
+// Execute provides a mock function with given fields: ctx, input
+func (_m *GetRandomProxyUseCase) Execute(ctx context.Context, input http.GetRandomProxyInput) (*proxy.Proxy, error) {
+	ret := _m.Called(ctx, input)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Execute")
@@ -33,19 +34,19 @@ func (_m *GetRandomProxyUseCase) Execute(ctx context.Context) (*proxy.Proxy, err
 
 	var r0 *proxy.Proxy
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (*proxy.Proxy, error)); ok {
-		return rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, http.GetRandomProxyInput) (*proxy.Proxy, error)); ok {
+		return rf(ctx, input)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) *proxy.Proxy); ok {
-		r0 = rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, http.GetRandomProxyInput) *proxy.Proxy); ok {
+		r0 = rf(ctx, input)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*proxy.Proxy)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
+	if rf, ok := ret.Get(1).(func(context.Context, http.GetRandomProxyInput) error); ok {
+		r1 = rf(ctx, input)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -60,13 +61,14 @@ type GetRandomProxyUseCase_Execute_Call struct {
 
 // Execute is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *GetRandomProxyUseCase_Expecter) Execute(ctx interface{}) *GetRandomProxyUseCase_Execute_Call {
-	return &GetRandomProxyUseCase_Execute_Call{Call: _e.mock.On("Execute", ctx)}
+//   - input http.GetRandomProxyInput
+func (_e *GetRandomProxyUseCase_Expecter) Execute(ctx interface{}, input interface{}) *GetRandomProxyUseCase_Execute_Call {
+	return &GetRandomProxyUseCase_Execute_Call{Call: _e.mock.On("Execute", ctx, input)}
 }
 
-func (_c *GetRandomProxyUseCase_Execute_Call) Run(run func(ctx context.Context)) *GetRandomProxyUseCase_Execute_Call {
+func (_c *GetRandomProxyUseCase_Execute_Call) Run(run func(ctx context.Context, input http.GetRandomProxyInput)) *GetRandomProxyUseCase_Execute_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
+		run(args[0].(context.Context), args[1].(http.GetRandomProxyInput))
 	})
 	return _c
 }
@@ -76,7 +78,7 @@ func (_c *GetRandomProxyUseCase_Execute_Call) Return(_a0 *proxy.Proxy, _a1 error
 	return _c
 }
 
-func (_c *GetRandomProxyUseCase_Execute_Call) RunAndReturn(run func(context.Context) (*proxy.Proxy, error)) *GetRandomProxyUseCase_Execute_Call {
+func (_c *GetRandomProxyUseCase_Execute_Call) RunAndReturn(run func(context.Context, http.GetRandomProxyInput) (*proxy.Proxy, error)) *GetRandomProxyUseCase_Execute_Call {
 	_c.Call.Return(run)
 	return _c
 }
