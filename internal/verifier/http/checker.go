@@ -131,7 +131,7 @@ func (c *Checker) checkIntegrity(body []byte) bool {
 
 	var data map[string]any
 	if err := json.Unmarshal(body, &data); err != nil {
-		return false 
+		return false
 	}
 
 	for key := range data {
