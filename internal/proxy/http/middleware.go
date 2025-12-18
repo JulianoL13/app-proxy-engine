@@ -13,7 +13,6 @@ type ctxKey string
 const loggerKey ctxKey = "logger"
 const correlationIDKey ctxKey = "correlation_id"
 
-// CorrelationIDMiddleware reads X-Correlation-ID from Kong or falls back to chi's RequestID
 func CorrelationIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		correlationID := r.Header.Get("X-Correlation-ID")
@@ -29,7 +28,6 @@ func CorrelationIDMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// GetCorrelationID returns the correlation ID from context
 func GetCorrelationID(ctx context.Context) string {
 	if id, ok := ctx.Value(correlationIDKey).(string); ok {
 		return id

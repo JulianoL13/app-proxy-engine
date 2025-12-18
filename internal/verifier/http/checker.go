@@ -23,12 +23,10 @@ type Logger interface {
 
 const DefaultVerifyURL = "https://httpbin.org/get"
 
-// Security: campos esperados no response do httpbin
 var expectedFields = map[string]bool{
 	"args": true, "headers": true, "origin": true, "url": true,
 }
 
-// Security: limite de tamanho do payload (típico ~300 bytes, 2KB é generoso)
 const maxPayloadSize = 2048
 
 type Checker struct {
@@ -87,7 +85,6 @@ func (c *Checker) fetchRealIP() string {
 	return result.Origin
 }
 
-// Security: busca baseline (payload esperado via request direto)
 func (c *Checker) ensureBaseline() {
 	if c.baseline != nil {
 		return
@@ -121,24 +118,20 @@ func (c *Checker) ensureBaseline() {
 	c.logger.Info("baseline cached", "hash", c.baselineHash[:16]+"...")
 }
 
-// Security: calcula SHA256 do payload
 func (c *Checker) hashPayload(data []byte) string {
 	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:])
 }
 
-// Security: verifica se payload foi modificado pelo proxy
 func (c *Checker) checkIntegrity(body []byte) bool {
-	// 1. Verificar tamanho (típico ~300 bytes, >2KB é suspeito)
 	if len(body) > maxPayloadSize {
 		c.logger.Warn("payload size exceeded limit", "size", len(body), "max", maxPayloadSize)
 		return false
 	}
 
-	// 2. Verificar campos esperados
 	var data map[string]any
 	if err := json.Unmarshal(body, &data); err != nil {
-		return false // JSON inválido
+		return false 
 	}
 
 	for key := range data {
@@ -148,7 +141,6 @@ func (c *Checker) checkIntegrity(body []byte) bool {
 		}
 	}
 
-	// 3. Verificar headers extras suspeitos (se temos baseline)
 	if c.baseline != nil {
 		var baselineData map[string]any
 		if err := json.Unmarshal(c.baseline, &baselineData); err == nil {
@@ -157,7 +149,6 @@ func (c *Checker) checkIntegrity(body []byte) bool {
 
 			for key := range proxyHeaders {
 				if _, exists := baseHeaders[key]; !exists {
-					// Header novo adicionado pelo proxy
 					if strings.HasPrefix(strings.ToLower(key), "x-") ||
 						strings.Contains(strings.ToLower(key), "inject") ||
 						strings.Contains(strings.ToLower(key), "ad") {
@@ -245,7 +236,6 @@ func (c *Checker) Verify(ctx context.Context, p verifier.Verifiable) verifier.Ve
 		}
 	}
 
-	// Security: verifica integridade do payload
 	if !c.checkIntegrity(body) {
 		c.logger.Warn("proxy failed integrity check", "address", p.Address())
 		return verifier.VerifyOutput{

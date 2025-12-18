@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Mock logger
 type mockLogger struct{}
 
 func (m *mockLogger) Info(msg string, args ...any)  {}
@@ -82,21 +81,16 @@ func TestChecker_checkIntegrity(t *testing.T) {
 func TestChecker_hashPayload(t *testing.T) {
 	c := &Checker{}
 
-	// Same input = same hash
 	hash1 := c.hashPayload([]byte("test data"))
 	hash2 := c.hashPayload([]byte("test data"))
 	assert.Equal(t, hash1, hash2)
-
-	// Different input = different hash
 	hash3 := c.hashPayload([]byte("different data"))
 	assert.NotEqual(t, hash1, hash3)
 
-	// Hash is 64 chars (SHA256 hex)
 	assert.Len(t, hash1, 64)
 }
 
 func TestExpectedFields(t *testing.T) {
-	// Verify expected fields map is correct
 	assert.True(t, expectedFields["args"])
 	assert.True(t, expectedFields["headers"])
 	assert.True(t, expectedFields["origin"])
@@ -106,6 +100,5 @@ func TestExpectedFields(t *testing.T) {
 }
 
 func TestMaxPayloadSize(t *testing.T) {
-	// Verify constant is reasonable
 	assert.Equal(t, 2048, maxPayloadSize)
 }

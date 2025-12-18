@@ -32,7 +32,7 @@ GET {{baseUrl}}/api/v1/proxies?anonymity=elite
 GET {{baseUrl}}/api/v1/proxies?max_latency_ms=150
 
 ### Combined Filters
-GET {{baseUrl}}/api/v1/proxies?protocol=http&anonymity=elite&max_latency_ms=200
+GET {{baseUrl}}/api/v1/proxies?protocol=http&anonymity=elite&max_latency_ms=15000
 
 ### Get Random Proxy
 GET {{baseUrl}}/api/v1/proxies/random

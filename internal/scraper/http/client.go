@@ -14,7 +14,12 @@ import (
 	"github.com/JulianoL13/app-proxy-engine/internal/scraper"
 )
 
-const maxBodySize = 10 * 1024 * 1024 // 10MB
+const (
+	_           = iota
+	KB          = 1 << (10 * iota)
+	MB          = 1 << (10 * iota)
+	maxBodySize = 10 * MB
+)
 
 type Logger interface {
 	Debug(msg string, args ...any)
@@ -104,7 +109,6 @@ func parseLine(line string, source scraper.Source) (*scraper.ScrapeOutput, error
 		return nil, fmt.Errorf("invalid port")
 	}
 
-	// Format: IP:Port:User:Pass
 	if len(parts) == 4 {
 		username := strings.TrimSpace(parts[2])
 		password := strings.TrimSpace(parts[3])
