@@ -1,4 +1,4 @@
-FROM golang:1.24-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
 
 WORKDIR /app
 
@@ -12,11 +12,13 @@ RUN go mod download
 
 COPY . .
 
+ARG TARGETOS
+ARG TARGETARCH
 ARG VERSION=dev
 ARG COMMIT=unknown
 ARG BUILD_TIME=unknown
 
-RUN CGO_ENABLED=0 GOOS=linux go build \
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build \
     -ldflags="-w -s -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.buildTime=${BUILD_TIME}" \
     -o /app/bin/scheduler ./cmd/scheduler
 
